@@ -94,15 +94,6 @@ export async function fetchGa4OrganicConversions(params: {
 }
 
 export async function listGa4Properties(accessToken: string) {
-  const accountsRes = await fetch(
-    "https://analyticsadmin.googleapis.com/v1beta/accounts",
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!accountsRes.ok) throw new Error(`GA4 admin accounts error ${accountsRes.status}`);
-  const accountsJson = (await accountsRes.json()) as {
-    accounts?: Array<{ name: string; displayName: string }>;
-  };
-
   const out: Array<{
     propertyId: string;
     displayName: string;
@@ -110,24 +101,52 @@ export async function listGa4Properties(accessToken: string) {
     account: string;
   }> = [];
 
-  for (const account of accountsJson.accounts ?? []) {
-    const res = await fetch(
-      `https://analyticsadmin.googleapis.com/v1beta/properties?filter=parent:${encodeURIComponent(account.name)}&pageSize=200`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    if (!res.ok) continue;
-    const json = (await res.json()) as {
-      properties?: Array<{ name: string; displayName: string; timeZone?: string }>;
-    };
-    for (const p of json.properties ?? []) {
-      out.push({
-        propertyId: p.name.replace("properties/", ""),
-        displayName: p.displayName,
-        timezone: p.timeZone || "UTC",
-        account: account.displayName,
-      });
+  let pageToken: string | undefined;
+  do {
+    const url = new URL("https://analyticsadmin.googleapis.com/v1beta/accountSummaries");
+    url.searchParams.set("pageSize", "200");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`GA4 admin error ${res.status}: ${text}`);
     }
-  }
+
+    const json = (await res.json()) as {
+      accountSummaries?: Array<{
+        displayName?: string;
+        propertySummaries?: Array<{ property: string; displayName: string }>;
+      }>;
+      nextPageToken?: string;
+    };
+
+    for (const account of json.accountSummaries ?? []) {
+      for (const p of account.propertySummaries ?? []) {
+        out.push({
+          propertyId: p.property.replace("properties/", ""),
+          displayName: p.displayName,
+          timezone: "UTC",
+          account: account.displayName || "GA4",
+        });
+      }
+    }
+    pageToken = json.nextPageToken;
+  } while (pageToken);
 
   return out;
+}
+
+export async function getGa4PropertyTimezone(accessToken: string, propertyId: string) {
+  const name = propertyId.startsWith("properties/")
+    ? propertyId
+    : `properties/${propertyId}`;
+  const res = await fetch(`https://analyticsadmin.googleapis.com/v1beta/${name}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return "UTC";
+  const json = (await res.json()) as { timeZone?: string };
+  return json.timeZone || "UTC";
 }

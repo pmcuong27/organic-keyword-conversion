@@ -1,9 +1,12 @@
 import { getDataSourceInfo } from "@/lib/data-blending";
+import { getDashboardContext } from "@/lib/dashboard-context";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SourcesPage() {
-  const info = await getDataSourceInfo();
+  const ctx = await getDashboardContext();
+  const info = await getDataSourceInfo(ctx.property?.id ?? null);
+  const mapping = info.mapping;
   const offline = info.offline as {
     path?: string;
     gscRows?: number;
@@ -11,14 +14,15 @@ export default async function SourcesPage() {
     gscRange?: { min: string | null; max: string | null };
     ga4Range?: { min: string | null; max: string | null };
     error?: string;
-  };
+  } | null;
 
   return (
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-lg font-semibold">Data Sources</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Live dashboard reads the offline SQLite store filled by the GSC/GA4 Python exporters.
+          Blend any Search Console site with any GA4 property the signed-in Google account
+          can access. Pairings are stored per user.
         </p>
       </div>
 
@@ -29,68 +33,74 @@ export default async function SourcesPage() {
         </Badge>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      {mapping ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card className="shadow-none">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Google Search Console</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
+              <p className="break-all">{mapping.gscSiteUrl}</p>
+              <p>
+                Cached rows:{" "}
+                <span className="font-semibold tabular-nums">{mapping.gscRows}</span>
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-none">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">GA4 property</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm">
+              <p>
+                {mapping.ga4DisplayName || mapping.ga4PropertyId}{" "}
+                <span className="text-muted-foreground">({mapping.ga4PropertyId})</span>
+              </p>
+              <p className="text-xs text-muted-foreground">Timezone {mapping.timezone}</p>
+              <p>
+                Cached rows:{" "}
+                <span className="font-semibold tabular-nums">{mapping.ga4Rows}</span>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {offline ? (
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Google Search Console</CardTitle>
+            <CardTitle className="text-sm">Offline database</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 text-sm">
+          <CardContent className="space-y-2 text-sm">
             <p>
-              Rows:{" "}
+              GSC rows{" "}
               <span className="font-semibold tabular-nums">{offline.gscRows ?? "—"}</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {offline.gscRange?.min ?? "—"} → {offline.gscRange?.max ?? "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-none">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">GA4 Organic</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p>
-              Rows:{" "}
+              {" · "}
+              GA4 rows{" "}
               <span className="font-semibold tabular-nums">{offline.ga4Rows ?? "—"}</span>
             </p>
-            <p className="text-xs text-muted-foreground">
-              {offline.ga4Range?.min ?? "—"} → {offline.ga4Range?.max ?? "—"}
-            </p>
+            {offline.error ? (
+              <p className="text-sm text-destructive">{offline.error}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Optional local SQLite path for development only. Do not commit this file.
+              </p>
+            )}
           </CardContent>
         </Card>
-      </div>
+      ) : null}
 
-      <Card className="shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Offline database</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            {offline.path || "not configured"}
-          </p>
-          {offline.error ? (
-            <p className="text-sm text-destructive">{offline.error}</p>
-          ) : (
-            <p className="text-muted-foreground">
-              Last synced:{" "}
-              {info.lastSyncedAt
-                ? new Date(info.lastSyncedAt).toLocaleString()
-                : "unknown"}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Refresh with:{" "}
-            <code className="rounded bg-secondary px-1 py-0.5">
-              py main.py sync
-            </code>{" "}
-            and{" "}
-            <code className="rounded bg-secondary px-1 py-0.5">
-              py main.py ga4-sync
-            </code>{" "}
-            from the project root.
-          </p>
-        </CardContent>
-      </Card>
+      {info.mode === "live" && !mapping ? (
+        <p className="text-sm text-muted-foreground">
+          No pairing selected. Open Settings or Onboarding to connect a GSC site with a GA4
+          property.
+        </p>
+      ) : null}
+
+      <p className="text-xs text-muted-foreground">
+        Last synced:{" "}
+        {info.lastSyncedAt ? new Date(info.lastSyncedAt).toLocaleString() : "not yet"}
+      </p>
     </div>
   );
 }

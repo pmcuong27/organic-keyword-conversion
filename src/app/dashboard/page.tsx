@@ -1,21 +1,21 @@
 import { Suspense } from "react";
-import { subDays } from "date-fns";
 import { getOverviewStats } from "@/lib/data-blending";
+import { getDashboardContext } from "@/lib/dashboard-context";
+import { rangeToDates } from "@/lib/range";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PerformanceChart } from "@/components/dashboard/performance-chart";
 import { TopKeywordsList } from "@/components/dashboard/top-keywords-list";
 import { DashboardSkeleton } from "@/components/dashboard/skeletons";
 
-function rangeToDates(range: string) {
-  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
-  const to = new Date();
-  const from = subDays(to, days - 1);
-  return { from, to };
-}
-
 async function OverviewContent({ range }: { range: string }) {
   const { from, to } = rangeToDates(range);
-  const stats = await getOverviewStats({ propertyId: null, from, to });
+  const ctx = await getDashboardContext();
+  const stats = await getOverviewStats({
+    propertyId: ctx.property?.id ?? null,
+    userId: ctx.userId,
+    from,
+    to,
+  });
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -23,8 +23,16 @@ async function OverviewContent({ range }: { range: string }) {
         <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
         <p className="text-sm text-muted-foreground">
           Organic keyword performance blended with GA4 conversions
+          {ctx.property ? ` · ${ctx.property.name}` : ""}
         </p>
       </div>
+
+      {stats.rowCount === 0 ? (
+        <p className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+          No blended rows yet. Choose a GSC × GA4 pair and click <span className="text-foreground">Sync</span>{" "}
+          to pull the selected date range.
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { isDemoMode } from "@/lib/app-mode";
 import { Button } from "@/components/ui/button";
+import { signInWithGoogle } from "@/app/actions/account";
 
 export default function HomePage() {
-  if (
-    process.env.DEMO_MODE === "true" ||
-    process.env.USE_OFFLINE_DB === "true" ||
-    process.env.NEXT_PUBLIC_USE_OFFLINE_DB === "true"
-  ) {
+  if (isDemoMode()) {
     redirect("/dashboard");
   }
 
@@ -21,16 +19,22 @@ export default function HomePage() {
           Attribute organic keywords to real GA4 conversions
         </h1>
         <p className="mx-auto max-w-xl text-muted-foreground">
-          Blend Google Search Console queries with GA4 organic landing-page events.
-          Dense, fast, WhatConverts-style analytics.
+          Sign in with Google, then pair any Search Console site with any GA4 property
+          that account can access.
         </p>
       </div>
       <div className="flex gap-3">
-        <Button asChild>
-          <Link href="/login">Get started</Link>
-        </Button>
+        {process.env.GOOGLE_CLIENT_ID ? (
+          <form action={signInWithGoogle}>
+            <Button type="submit">Get started</Button>
+          </form>
+        ) : (
+          <Button asChild>
+            <Link href="/login">Get started</Link>
+          </Button>
+        )}
         <Button asChild variant="outline">
-          <Link href="/dashboard">Open dashboard</Link>
+          <Link href="/login">Sign in</Link>
         </Button>
       </div>
     </div>

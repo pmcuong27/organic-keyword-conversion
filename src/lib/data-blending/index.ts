@@ -6,4 +6,5 @@ export * from "./demo-data";
 export * from "./query-mapping";
 export * from "./journey";
 export * from "./offline-db";
+export * from "./sync";
 export * from "./queries";

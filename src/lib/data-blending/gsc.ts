@@ -79,7 +79,10 @@ export async function listGscSites(accessToken: string): Promise<string[]> {
   const res = await fetch("https://www.googleapis.com/webmasters/v3/sites", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`GSC sites error ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GSC sites error ${res.status}: ${text}`);
+  }
   const json = (await res.json()) as { siteEntry?: Array<{ siteUrl: string }> };
   return (json.siteEntry ?? []).map((s) => s.siteUrl);
 }

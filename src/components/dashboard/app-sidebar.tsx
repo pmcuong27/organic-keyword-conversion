@@ -12,10 +12,12 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { signOutAction } from "@/app/actions/account";
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -81,6 +83,21 @@ export function AppSidebar() {
           );
         })}
       </nav>
+      <div className="border-t border-border p-2">
+        <form action={signOutAction}>
+          <Button
+            type="submit"
+            variant="ghost"
+            className={cn(
+              "w-full justify-start gap-3 text-muted-foreground",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <LogOut className="size-4 shrink-0" />
+            {!collapsed && <span>Sign out</span>}
+          </Button>
+        </form>
+      </div>
     </aside>
   );
 }

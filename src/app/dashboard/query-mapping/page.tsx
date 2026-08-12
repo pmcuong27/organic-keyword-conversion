@@ -1,23 +1,18 @@
 import { Suspense } from "react";
-import { subDays } from "date-fns";
 import { getQueryMappingAnalysis } from "@/lib/data-blending";
+import { getDashboardContext } from "@/lib/dashboard-context";
+import { rangeToDates } from "@/lib/range";
 import { QueryMappingPanel } from "@/components/dashboard/query-mapping-panel";
 import { DashboardSkeleton } from "@/components/dashboard/skeletons";
 
-function rangeToDates(range: string) {
-  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
-  const to = new Date();
-  const from = subDays(to, days - 1);
-  return { from, to };
-}
-
 async function MappingContent({ range }: { range: string }) {
   const { from, to } = rangeToDates(range);
+  const ctx = await getDashboardContext();
   const { buckets, summary } = await getQueryMappingAnalysis({
-    propertyId: null,
+    propertyId: ctx.property?.id ?? null,
+    userId: ctx.userId,
     from,
     to,
-    // Real data is sparse — show all competing (2+) and sole conversion buckets
     crowdedOnly: false,
     withKeyEventsOnly: false,
   });

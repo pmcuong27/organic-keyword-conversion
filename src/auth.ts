@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { isDemoMode, useOfflineDb } from "@/lib/app-mode";
 
 const scopes = [
   "openid",
@@ -11,32 +12,34 @@ const scopes = [
   "https://www.googleapis.com/auth/analytics.readonly",
 ].join(" ");
 
-const demoMode = process.env.DEMO_MODE === "true";
-const offlineMode =
-  process.env.USE_OFFLINE_DB === "true" || demoMode;
-// Offline SQLite dashboard doesn't need Postgres/Auth.js adapter
-const skipDbAuth = offlineMode;
+const skipDbAuth = isDemoMode() || useOfflineDb();
+const googleReady = Boolean(
+  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: skipDbAuth ? undefined : PrismaAdapter(prisma),
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || "demo",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "demo",
-      authorization: {
-        params: {
-          scope: scopes,
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    }),
-  ],
+  providers: googleReady
+    ? [
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          authorization: {
+            params: {
+              scope: scopes,
+              access_type: "offline",
+              prompt: "consent",
+              include_granted_scopes: "true",
+            },
+          },
+        }),
+      ]
+    : [],
   session: { strategy: skipDbAuth ? "jwt" : "database" },
   callbacks: {
     async session({ session, user, token }) {
       if (session.user) {
-        session.user.id = user?.id ?? (token.sub as string) ?? "offline";
+        session.user.id = user?.id ?? (token.sub as string) ?? "demo";
       }
       return session;
     },

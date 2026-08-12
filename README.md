@@ -1,33 +1,68 @@
-# BlendAttrib (Next.js)
+# BlendAttrib
 
-GSC × GA4 keyword-to-conversion attribution dashboard.
+Blend Google Search Console queries with GA4 organic conversions. Pair **any** Search Console site with **any** GA4 property the signed-in Google account can access.
 
-## Quick start (demo)
+## Try the UI (no Google account)
 
 ```bash
-cd web
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-Open http://localhost:3000 — `DEMO_MODE=true` serves seeded attribution data without Google OAuth or Postgres.
+`DEMO_MODE=true` serves generic sample data at http://localhost:3000
 
-## Full stack (live Google + Postgres)
+## Live Google accounts
 
-1. `npm run db:up` (Docker Postgres)
-2. Copy `.env.example` → `.env` and set:
-   - `DATABASE_URL`
-   - `AUTH_SECRET`
-   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (Web client, redirect `http://localhost:3000/api/auth/callback/google`)
-   - `DEMO_MODE=false`
-3. Enable Google Analytics Data API, Admin API, Search Console API
-4. `npm run db:push`
-5. `npm run dev`
+The Google account you sign in with must have access to **both** the Search Console site and the GA4 property you want to blend. If they live in different organizations, invite that same user on both properties.
 
-## Features
+1. Create a Google Cloud project and enable:
+   - Google Search Console API
+   - Google Analytics Admin API
+   - Google Analytics Data API
+2. Create an OAuth **Web** client. Add authorized redirect URI:
+   - `http://localhost:3000/api/auth/callback/google`
+   - plus your production origin, e.g. `https://your-domain/api/auth/callback/google`
+3. If the OAuth app is in Testing, add each user under **Audience → Test users**.
+4. Start Postgres and configure env:
 
-- WhatConverts-style shell (sidebar, sticky header, Cmd+K)
-- URL normalizer + click-share attribution model
-- Virtualized keyword table (TanStack Table + Virtual)
-- Suspense skeletons, `useTransition` for filter updates
-- Overview KPIs + dual-axis clicks vs conversions chart
+```bash
+npm run db:up
+cp .env.example .env
+```
+
+Set in `.env`:
+
+```
+DEMO_MODE="false"
+USE_OFFLINE_DB="false"
+DATABASE_URL="postgresql://blend:blend@localhost:5432/gsc_ga4_blend?schema=public"
+AUTH_SECRET="replace-with-a-long-random-string"
+AUTH_URL="http://localhost:3000"
+GOOGLE_CLIENT_ID="...."
+GOOGLE_CLIENT_SECRET="...."
+```
+
+5. Push the schema and run:
+
+```bash
+npm run db:push
+npm run dev
+```
+
+6. Sign in with Google, then pick one GSC site and one GA4 property. Add more pairings in **Settings** (agencies / multiple brands).
+
+Use **Sync** in the header to refresh the selected date range from Google.
+
+## What this app does not do
+
+- It cannot join a GSC query to a specific GA4 session or cookie. Attribution is click-share on landing page × date (and hour when that grain exists).
+- It does not support two separate Google logins in one pairing. One signed-in account must be able to read both properties.
+
+## Optional offline SQLite
+
+For local development with the companion Python exporters, set `USE_OFFLINE_DB="true"` and `OFFLINE_DB_PATH` to a SQLite file. Do not commit that database.
+
+## License
+
+Use and modify freely. Do not commit `.env`, OAuth client secrets, or exported analytics databases.
