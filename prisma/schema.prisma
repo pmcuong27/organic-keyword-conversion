@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  properties    PropertyMapping[]
+  syncJobs      SyncJob[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Links a GA4 property with a GSC site for blending
+model PropertyMapping {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  ga4PropertyId   String
+  ga4DisplayName  String?
+  gscSiteUrl      String
+  timezone        String   @default("Pacific/Auckland")
+  isDefault       Boolean  @default(false)
+  lastSyncedAt    DateTime?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gscDaily        GscDailyMetric[]
+  ga4Daily        Ga4DailyMetric[]
+  attributions    KeywordAttribution[]
+  syncJobs        SyncJob[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, ga4PropertyId, gscSiteUrl])
+  @@index([userId])
+}
+
+model SyncJob {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String?
+  status     String   // running | ok | error
+  source     String   // gsc | ga4 | blend | full
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+  rowsUpserted Int    @default(0)
+  error      String?  @db.Text
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   PropertyMapping? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+}
+
+model GscDailyMetric {
+  id           String   @id @default(cuid())
+  propertyId   String
+  date         DateTime @db.Date
+  query        String
+  page         String
+  landingPage  String
+  clicks       Float    @default(0)
+  impressions  Float    @default(0)
+  ctr          Float    @default(0)
+  position     Float    @default(0)
+  property     PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([propertyId, date, query, page])
+  @@index([propertyId, date])
+  @@index([propertyId, landingPage, date])
+}
+
+model Ga4DailyMetric {
+  id            String   @id @default(cuid())
+  propertyId    String
+  date          DateTime @db.Date
+  landingPage   String
+  eventName     String
+  channelGroup  String   @default("Organic Search")
+  sessions      Float    @default(0)
+  conversions   Float    @default(0)
+  eventValue    Float    @default(0)
+  property      PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([propertyId, date, landingPage, eventName, channelGroup])
+  @@index([propertyId, date])
+  @@index([propertyId, landingPage, date])
+}
+
+/// Cached blended keyword → conversion attribution rows
+model KeywordAttribution {
+  id                  String   @id @default(cuid())
+  propertyId          String
+  date                DateTime @db.Date
+  keyword             String
+  landingPage         String
+  clicks              Float    @default(0)
+  impressions         Float    @default(0)
+  ctr                 Float    @default(0)
+  position            Float    @default(0)
+  pageTotalClicks     Float    @default(0)
+  clickShare          Float    @default(0)
+  organicConversions  Float    @default(0)
+  estimatedConversions Float   @default(0)
+  estimatedConvRate   Float    @default(0)
+  estimatedValue      Float    @default(0)
+  eventBreakdown      Json?
+  property            PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  updatedAt           DateTime @updatedAt
+
+  @@unique([propertyId, date, keyword, landingPage])
+  @@index([propertyId, date])
+  @@index([propertyId, estimatedConversions])
+  @@index([propertyId, keyword])
+}
