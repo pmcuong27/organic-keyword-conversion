@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { isDatabaseConnectionError, prisma } from "@/lib/prisma";
 import type { PropertyMapping } from "@prisma/client";
 
 export const PROPERTY_COOKIE = "ba_property";
@@ -27,11 +27,18 @@ export function toPropertyOption(row: PropertyMapping): PropertyOption {
 }
 
 export async function listUserProperties(userId: string): Promise<PropertyOption[]> {
-  const rows = await prisma.propertyMapping.findMany({
-    where: { userId },
-    orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
-  });
-  return rows.map(toPropertyOption);
+  try {
+    const rows = await prisma.propertyMapping.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+    return rows.map(toPropertyOption);
+  } catch (err) {
+    if (!isDatabaseConnectionError(err)) {
+      console.error("Failed to list property mappings", err);
+    }
+    return [];
+  }
 }
 
 export async function getSelectedProperty(

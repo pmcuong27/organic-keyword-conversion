@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth, signIn, signOut } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { auth, signIn } from "@/auth";
+import { isDatabaseConnectionError, prisma } from "@/lib/prisma";
 import { getGoogleAccessToken } from "@/lib/google-token";
 import { getGa4PropertyTimezone } from "@/lib/data-blending/ga4";
 import { PROPERTY_COOKIE } from "@/lib/properties";
@@ -18,12 +18,36 @@ async function requireUserId() {
   return session.user.id;
 }
 
-export async function signInWithGoogle() {
-  await signIn("google", { redirectTo: "/onboarding" });
+/** JWT sessions do not create Prisma users; pairings still need a User row. */
+async function ensureUserRow(userId: string) {
+  const session = await auth();
+  try {
+    await prisma.user.upsert({
+      where: { id: userId },
+      create: {
+        id: userId,
+        name: session?.user?.name ?? null,
+        email: session?.user?.email ?? null,
+        image: session?.user?.image ?? null,
+      },
+      update: {
+        name: session?.user?.name ?? null,
+        email: session?.user?.email ?? null,
+        image: session?.user?.image ?? null,
+      },
+    });
+  } catch (err) {
+    if (isDatabaseConnectionError(err)) {
+      throw new Error(
+        "Postgres is not running. In the web folder run: npm run db:up",
+      );
+    }
+    throw err;
+  }
 }
 
-export async function signOutAction() {
-  await signOut({ redirectTo: "/" });
+export async function signInWithGoogle() {
+  await signIn("google", { redirectTo: "/onboarding" });
 }
 
 export async function savePropertyMapping(formData: FormData) {
@@ -39,36 +63,44 @@ export async function savePropertyMapping(formData: FormData) {
 
   const accessToken = await getGoogleAccessToken(userId);
   const timezone = await getGa4PropertyTimezone(accessToken, ga4PropertyId);
+  await ensureUserRow(userId);
 
-  const existingCount = await prisma.propertyMapping.count({ where: { userId } });
+  try {
+    const existingCount = await prisma.propertyMapping.count({ where: { userId } });
 
-  const mapping = await prisma.propertyMapping.upsert({
-    where: {
-      userId_ga4PropertyId_gscSiteUrl: { userId, ga4PropertyId, gscSiteUrl },
-    },
-    create: {
-      userId,
-      name,
-      ga4PropertyId,
-      ga4DisplayName: ga4DisplayName || null,
-      gscSiteUrl,
-      timezone,
-      isDefault: existingCount === 0,
-    },
-    update: {
-      name,
-      ga4DisplayName: ga4DisplayName || null,
-      timezone,
-    },
-  });
+    const mapping = await prisma.propertyMapping.upsert({
+      where: {
+        userId_ga4PropertyId_gscSiteUrl: { userId, ga4PropertyId, gscSiteUrl },
+      },
+      create: {
+        userId,
+        name,
+        ga4PropertyId,
+        ga4DisplayName: ga4DisplayName || null,
+        gscSiteUrl,
+        timezone,
+        isDefault: existingCount === 0,
+      },
+      update: {
+        name,
+        ga4DisplayName: ga4DisplayName || null,
+        timezone,
+      },
+    });
 
-  const cookieStore = await cookies();
-  cookieStore.set(PROPERTY_COOKIE, mapping.id, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+    const cookieStore = await cookies();
+    cookieStore.set(PROPERTY_COOKIE, mapping.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  } catch (err) {
+    if (isDatabaseConnectionError(err)) {
+      throw new Error("Postgres is not running. In the web folder run: npm run db:up");
+    }
+    throw err;
+  }
 
   revalidatePath("/", "layout");
   redirect("/dashboard");

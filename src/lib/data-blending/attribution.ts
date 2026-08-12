@@ -23,9 +23,13 @@ export type Ga4Row = {
   device?: string | null;
   country?: string | null;
   sessions: number;
+  /** Total event count for this event name (all fires). */
+  eventCount?: number;
+  /** Key-event count (GA4 keyEvents metric). */
   conversions: number;
   eventValue: number;
   channelGroup?: string;
+  isKeyEvent?: boolean;
 };
 
 export type EventBreakdown = {
@@ -98,6 +102,10 @@ export function blendKeywordAttributions(
   const ga4ByBucket = new Map<BucketKey, Ga4Agg>();
 
   for (const row of ga4Rows) {
+    // Attribution only uses GA4 key events, not every event name.
+    const isKey = row.isKeyEvent ?? (row.conversions || 0) > 0;
+    if (!isKey) continue;
+
     const landingPage = normalizeLandingPage(row.landingPage);
     const dateKey = formatDateKey(toDateOnly(row.date));
     const hourKey = normalizeHour(row.hour);

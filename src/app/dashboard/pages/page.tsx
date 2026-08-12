@@ -1,12 +1,42 @@
+import { Suspense } from "react";
+import { getLandingPageRollups } from "@/lib/data-blending";
+import { getDashboardContext } from "@/lib/dashboard-context";
+import { rangeToDates } from "@/lib/range";
 import { PageHeading } from "@/components/dashboard/help-tip";
+import { LandingPagesTable } from "@/components/dashboard/landing-pages-table";
+import { TableSkeleton } from "@/components/dashboard/skeletons";
 
-export default function PagesPage() {
+async function PagesContent({ range }: { range: string }) {
+  const { from, to } = rangeToDates(range);
+  const ctx = await getDashboardContext();
+  const rows = await getLandingPageRollups({
+    propertyId: ctx.property?.id ?? null,
+    from,
+    to,
+  });
+
   return (
-    <div className="p-6">
+    <div className="flex h-full min-h-[calc(100svh-3.5rem)] flex-col gap-3 p-4 md:p-6">
       <PageHeading
         title="Pages & Landing URLs"
-        help="Landing-page rollups are not built yet. Use Keyword Attribution to see which queries share a page."
+        help="Each row is a normalized landing page. Search Console clicks and impressions are rolled up by page; GA4 organic key events and estimated conversions come from the same date range in the header."
       />
+      <LandingPagesTable data={rows} />
     </div>
+  );
+}
+
+export default async function PagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const sp = await searchParams;
+  const range = sp.range ?? "30d";
+
+  return (
+    <Suspense key={range} fallback={<TableSkeleton />}>
+      <PagesContent range={range} />
+    </Suspense>
   );
 }

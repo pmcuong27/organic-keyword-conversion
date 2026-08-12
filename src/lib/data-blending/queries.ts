@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { isDatabaseConnectionError, prisma } from "@/lib/prisma";
 import {
   blendKeywordAttributions,
   summarizeOverview,
@@ -21,10 +21,72 @@ import {
 } from "./offline-db";
 import { dataSourceMode, isDemoMode, useOfflineDb } from "@/lib/app-mode";
 import { readCachedMappingSources } from "./sync";
-import { toDateKey } from "@/lib/range";
+import { toDateKey, hourFromStorage } from "@/lib/range";
+import {
+  rollupConversionEvents,
+  rollupGscLandingPages,
+  rollupLandingPages,
+  type ConversionEventRollup,
+  type LandingPageRollup,
+} from "./rollups";
+
+async function loadMappingSources(params: {
+  propertyId?: string | null;
+  from: Date;
+  to: Date;
+}): Promise<{ gsc: GscMappingRow[]; ga4: Ga4MappingRow[] }> {
+  const fromKey = toDateKey(params.from);
+  const toKey = toDateKey(params.to);
+
+  if (isDemoMode()) {
+    const demo = getDemoSourceRows(30);
+    return {
+      gsc: demo.gsc.filter((r) => r.date >= fromKey && r.date <= toKey),
+      ga4: demo.ga4.filter((r) => r.date >= fromKey && r.date <= toKey),
+    };
+  }
+  if (useOfflineDb()) {
+    return readOfflineMappingSources(fromKey, toKey);
+  }
+  if (params.propertyId) {
+    return readCachedMappingSources(params.propertyId, params.from, params.to);
+  }
+  return { gsc: [], ga4: [] };
+}
+
+export async function getLandingPageRollups(params: {
+  propertyId?: string | null;
+  from: Date;
+  to: Date;
+}): Promise<LandingPageRollup[]> {
+  const [attributionRows, sources] = await Promise.all([
+    getAttributionRows(params),
+    loadMappingSources(params),
+  ]);
+
+  const rollups = rollupLandingPages(attributionRows, sources.ga4);
+  if (rollups.length) return rollups;
+
+  if (sources.gsc.length) {
+    return rollupGscLandingPages(sources.gsc);
+  }
+  return [];
+}
+
+export async function getConversionEventRollups(params: {
+  propertyId?: string | null;
+  from: Date;
+  to: Date;
+  mode?: "all" | "key";
+}): Promise<ConversionEventRollup[]> {
+  const sources = await loadMappingSources(params);
+  return rollupConversionEvents(sources.ga4, params.mode ?? "key");
+}
+
 
 function mapCachedAttribution(r: {
   date: Date;
+  hour?: string | null;
   keyword: string;
   landingPage: string;
   clicks: number;
@@ -41,7 +103,7 @@ function mapCachedAttribution(r: {
 }): KeywordAttributionRow {
   return {
     date: r.date.toISOString().slice(0, 10),
-    hour: null,
+    hour: hourFromStorage(r.hour),
     keyword: r.keyword,
     landingPage: r.landingPage,
     clicks: r.clicks,
@@ -81,15 +143,18 @@ export async function getAttributionRows(params: {
 
   if (!params.propertyId) return [];
 
-  const cached = await prisma.keywordAttribution.findMany({
-    where: {
-      propertyId: params.propertyId,
-      date: { gte: params.from, lte: params.to },
-    },
-    orderBy: [{ estimatedConversions: "desc" }, { clicks: "desc" }],
-  });
-
-  if (cached.length) return cached.map(mapCachedAttribution);
+  try {
+    const cached = await prisma.keywordAttribution.findMany({
+      where: {
+        propertyId: params.propertyId,
+        date: { gte: params.from, lte: params.to },
+      },
+      orderBy: [{ estimatedConversions: "desc" }, { clicks: "desc" }],
+    });
+    if (cached.length) return cached.map(mapCachedAttribution);
+  } catch (err) {
+    if (!isDatabaseConnectionError(err)) throw err;
+  }
 
   return [];
 }
@@ -129,12 +194,9 @@ export async function getQueryMappingAnalysis(params: {
     gsc = offline.gsc;
     ga4 = offline.ga4;
   } else if (params.propertyId) {
-    const cached = await readCachedMappingSources(params.propertyId, params.from, params.to);
+    const cached = await loadMappingSources(params);
     gsc = cached.gsc;
     ga4 = cached.ga4;
-  } else {
-    gsc = [];
-    ga4 = [];
   }
 
   let buckets = buildQueryMappingAnalysis(gsc, ga4);
@@ -157,11 +219,16 @@ export async function getLastSyncAt(propertyId?: string | null) {
     return readOfflineLastSyncedAt();
   }
   if (!propertyId) return null;
-  const row = await prisma.propertyMapping.findUnique({
-    where: { id: propertyId },
-    select: { lastSyncedAt: true },
-  });
-  return row?.lastSyncedAt ?? null;
+  try {
+    const row = await prisma.propertyMapping.findUnique({
+      where: { id: propertyId },
+      select: { lastSyncedAt: true },
+    });
+    return row?.lastSyncedAt ?? null;
+  } catch (err) {
+    if (isDatabaseConnectionError(err)) return null;
+    throw err;
+  }
 }
 
 export async function getDataSourceInfo(propertyId?: string | null) {
@@ -184,16 +251,22 @@ export async function getDataSourceInfo(propertyId?: string | null) {
     };
   }
 
-  const mapping = propertyId
-    ? await prisma.propertyMapping.findUnique({ where: { id: propertyId } })
-    : null;
-
-  const [gscRows, ga4Rows] = mapping
-    ? await Promise.all([
+  let mapping = null;
+  let gscRows = 0;
+  let ga4Rows = 0;
+  try {
+    mapping = propertyId
+      ? await prisma.propertyMapping.findUnique({ where: { id: propertyId } })
+      : null;
+    if (mapping) {
+      [gscRows, ga4Rows] = await Promise.all([
         prisma.gscDailyMetric.count({ where: { propertyId: mapping.id } }),
         prisma.ga4DailyMetric.count({ where: { propertyId: mapping.id } }),
-      ])
-    : [0, 0];
+      ]);
+    }
+  } catch (err) {
+    if (!isDatabaseConnectionError(err)) throw err;
+  }
 
   return {
     mode,

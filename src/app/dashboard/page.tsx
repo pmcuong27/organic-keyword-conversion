@@ -7,6 +7,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PerformanceChart } from "@/components/dashboard/performance-chart";
 import { TopKeywordsList } from "@/components/dashboard/top-keywords-list";
 import { DashboardSkeleton } from "@/components/dashboard/skeletons";
+import { SyncLast24HoursButton } from "@/components/dashboard/sync-last-24h-button";
 
 async function OverviewContent({ range }: { range: string }) {
   const { from, to } = rangeToDates(range);
@@ -22,7 +23,7 @@ async function OverviewContent({ range }: { range: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeading
           title="Overview"
-          help="GSC clicks and impressions are joined to GA4 organic key events on the same landing page and day. Estimated conversions are the page's key events weighted by each keyword's share of clicks. Click Sync after you pair a Search Console site with a GA4 property."
+          help="GSC clicks and impressions are joined to GA4 organic key events on the same landing page and day. Estimated conversions are the page's key events weighted by each keyword's share of clicks. After you pair a Search Console site with a GA4 property, download the last 24 hours to populate the dashboard."
         />
         {ctx.property ? (
           <p className="text-xs text-muted-foreground">{ctx.property.name}</p>
@@ -30,10 +31,25 @@ async function OverviewContent({ range }: { range: string }) {
       </div>
 
       {stats.rowCount === 0 ? (
-        <p className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          No blended rows yet. Choose a GSC × GA4 pair and click <span className="text-foreground">Sync</span>{" "}
-          to pull the selected date range.
-        </p>
+        <div className="rounded-md border border-border bg-card px-4 py-4">
+          {ctx.mode === "live" && ctx.property ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Pull Search Console and GA4</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {ctx.property.name} is connected. Download yesterday and today from Google
+                  Search Console and GA4 organic key events.
+                </p>
+              </div>
+              <SyncLast24HoursButton />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No blended rows yet. Pair a Search Console site with a GA4 property, then download
+              the last 24 hours.
+            </p>
+          )}
+        </div>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

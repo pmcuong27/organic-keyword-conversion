@@ -23,9 +23,11 @@ export type Ga4MappingRow = {
   device?: string | null;
   country?: string | null;
   sessions: number;
+  eventCount?: number;
   conversions: number;
   eventValue: number;
   channelGroup?: string;
+  isKeyEvent?: boolean;
 };
 
 export type ConfidenceLevel = "high" | "medium" | "low";
@@ -259,6 +261,8 @@ export function buildQueryMappingAnalysis(
   const ga4ByBucket = new Map<string, Ga4Bucket>();
 
   for (const row of ga4Rows) {
+    if (!(row.isKeyEvent ?? (row.conversions || 0) > 0)) continue;
+
     const landingPage = normalizeLandingPage(row.landingPage);
     const conversionPage = normalizeLandingPage(row.conversionPage || row.landingPage);
     const date = formatDateKey(toDateOnly(row.date));

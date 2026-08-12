@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SyncLast24HoursButton } from "@/components/dashboard/sync-last-24h-button";
 import {
   Select,
   SelectContent,
@@ -15,10 +16,11 @@ import {
 } from "@/components/ui/select";
 import { CommandMenu } from "@/components/dashboard/command-menu";
 import { HelpTip } from "@/components/dashboard/help-tip";
-import { selectPropertyAction, syncSelectedPropertyAction } from "@/app/actions/account";
+import { selectPropertyAction } from "@/app/actions/account";
 import type { PropertyOption } from "@/lib/properties";
 
 const ranges = [
+  { value: "24h", label: "Last 24 hours" },
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
   { value: "90d", label: "Last 90 days" },
@@ -63,17 +65,6 @@ export function AppHeader({
     if (id === "none") return;
     startTransition(async () => {
       await selectPropertyAction(id);
-      router.refresh();
-    });
-  }
-
-  function onSync() {
-    setSyncError(null);
-    startTransition(async () => {
-      const result = await syncSelectedPropertyAction(range);
-      if (result && "error" in result && result.error) {
-        setSyncError(result.error);
-      }
       router.refresh();
     });
   }
@@ -136,16 +127,13 @@ export function AppHeader({
 
         <div className="ml-auto flex items-center gap-2">
           {dataMode === "live" ? (
-            <Button
-              variant="outline"
+            <SyncLast24HoursButton
               size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={onSync}
-              disabled={pending || !selected}
-            >
-              <RefreshCw className={`size-3 ${pending ? "animate-spin" : ""}`} />
-              Sync
-            </Button>
+              className="h-8 text-xs"
+              disabled={!selected}
+              showStatus={false}
+              onError={setSyncError}
+            />
           ) : null}
           <Badge
             className={
@@ -158,7 +146,7 @@ export function AppHeader({
           </Badge>
           <HelpTip label="About data mode">
             {dataMode === "live"
-              ? "Live mode reads Search Console and GA4 for the selected pairing using the signed-in Google account."
+              ? "Live mode reads Search Console and GA4 for the selected pairing. Download last 24 hours pulls yesterday and today (GSC and GA4 report by calendar day)."
               : dataMode === "demo"
                 ? "Demo mode shows sample data so you can explore the UI without Google."
                 : "Offline mode reads a local SQLite export. It is for development, not hosted users."}

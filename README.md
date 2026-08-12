@@ -49,6 +49,8 @@ npm run db:up
 cp .env.example .env
 ```
 
+`npm run db:up` starts Docker Postgres when Docker Desktop is running. If Docker is not available, it starts a local Prisma Postgres instance and writes `DATABASE_URL` for you.
+
 ```
 DEMO_MODE="false"
 USE_OFFLINE_DB="false"

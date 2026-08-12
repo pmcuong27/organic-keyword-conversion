@@ -136,9 +136,11 @@ export function readOfflineGa4Rows(fromKey: string, toKey: string): Ga4Row[] {
         device: normalizeDevice(r.device_category),
         country: normalizeCountryCode(r.country),
         sessions: Number(r.sessions || 0),
+        eventCount: keyEvents > 0 ? keyEvents : Number(r.sessions || 0),
         conversions: keyEvents,
         eventValue: keyEvents * 100,
         channelGroup: r.channel_group || "Organic Search",
+        isKeyEvent: keyEvents > 0,
       };
     });
   } finally {
@@ -172,9 +174,11 @@ export function readOfflineMappingSources(fromKey: string, toKey: string): {
     device: r.device,
     country: r.country,
     sessions: r.sessions,
+    eventCount: r.eventCount ?? r.conversions,
     conversions: r.conversions,
     eventValue: r.eventValue,
     channelGroup: r.channelGroup,
+    isKeyEvent: r.isKeyEvent ?? r.conversions > 0,
   }));
 
   return { gsc, ga4 };

@@ -101,6 +101,7 @@ model GscDailyMetric {
   id           String   @id @default(cuid())
   propertyId   String
   date         DateTime @db.Date
+  hour         String   @default("")
   query        String
   page         String
   landingPage  String
@@ -111,7 +112,7 @@ model GscDailyMetric {
   property     PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
 
-  @@unique([propertyId, date, query, page])
+  @@unique([propertyId, date, hour, query, page])
   @@index([propertyId, date])
   @@index([propertyId, landingPage, date])
 }
@@ -120,18 +121,22 @@ model Ga4DailyMetric {
   id            String   @id @default(cuid())
   propertyId    String
   date          DateTime @db.Date
+  hour          String   @default("")
   landingPage   String
   eventName     String
   channelGroup  String   @default("Organic Search")
   sessions      Float    @default(0)
+  eventCount    Float    @default(0)
   conversions   Float    @default(0)
   eventValue    Float    @default(0)
+  isKeyEvent    Boolean  @default(false)
   property      PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt     DateTime @updatedAt
 
-  @@unique([propertyId, date, landingPage, eventName, channelGroup])
+  @@unique([propertyId, date, hour, landingPage, eventName, channelGroup])
   @@index([propertyId, date])
   @@index([propertyId, landingPage, date])
+  @@index([propertyId, isKeyEvent])
 }
 
 /// Cached blended keyword → conversion attribution rows
@@ -139,6 +144,7 @@ model KeywordAttribution {
   id                  String   @id @default(cuid())
   propertyId          String
   date                DateTime @db.Date
+  hour                String   @default("")
   keyword             String
   landingPage         String
   clicks              Float    @default(0)
@@ -155,7 +161,7 @@ model KeywordAttribution {
   property            PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt           DateTime @updatedAt
 
-  @@unique([propertyId, date, keyword, landingPage])
+  @@unique([propertyId, date, hour, keyword, landingPage])
   @@index([propertyId, date])
   @@index([propertyId, estimatedConversions])
   @@index([propertyId, keyword])

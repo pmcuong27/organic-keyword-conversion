@@ -1,34 +1,35 @@
 import { auth } from "@/auth";
 import { isDemoMode, isLiveGoogleMode } from "@/lib/app-mode";
+import { getOauthPublicConfig } from "@/lib/oauth-env";
 import { getGoogleAccessToken } from "@/lib/google-token";
 import { listGa4Properties } from "@/lib/data-blending/ga4";
 import { listGscSites } from "@/lib/data-blending/gsc";
 import { listUserProperties } from "@/lib/properties";
 import { PageHeading } from "@/components/dashboard/help-tip";
 import { ConnectAccountsForm } from "@/components/dashboard/connect-accounts-form";
+import { OauthSettingsForm } from "@/components/dashboard/oauth-settings-form";
 import { deletePropertyAction } from "@/app/actions/account";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SettingsPage() {
-  if (isDemoMode()) {
-    return (
-      <div className="space-y-3 p-6">
-        <PageHeading
-          title="Settings"
-          help="Demo mode uses sample data only. Set DEMO_MODE=false and add Google OAuth credentials on the server to pair real accounts."
-        />
-      </div>
-    );
-  }
+  const oauth = getOauthPublicConfig();
 
-  if (!isLiveGoogleMode()) {
+  if (isDemoMode() || !isLiveGoogleMode()) {
     return (
-      <div className="space-y-3 p-6">
+      <div className="space-y-6 p-6">
         <PageHeading
           title="Settings"
-          help="Offline SQLite mode reads a local exporter database. Turn USE_OFFLINE_DB off to connect live Google accounts."
+          help="Paste Google OAuth Web client fields here instead of editing .env. Turn on live Google sign-in when you are ready to connect Search Console and GA4."
         />
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Google sign-in</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OauthSettingsForm initial={oauth} />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -60,8 +61,17 @@ export default async function SettingsPage() {
     <div className="space-y-6 p-6">
       <PageHeading
         title="Settings"
-        help="Each pairing blends one Search Console site with one GA4 property. Add as many client or brand pairs as this Google account can access. The signed-in account must already be a user on both."
+        help="Each pairing blends one Search Console site with one GA4 property. Google OAuth fields can be updated below without editing .env."
       />
+
+      <Card className="shadow-none">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Google sign-in</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OauthSettingsForm initial={oauth} />
+        </CardContent>
+      </Card>
 
       <Card className="shadow-none">
         <CardHeader className="pb-2">

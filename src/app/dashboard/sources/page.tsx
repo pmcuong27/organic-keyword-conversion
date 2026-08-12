@@ -3,6 +3,7 @@ import { getDashboardContext } from "@/lib/dashboard-context";
 import { PageHeading } from "@/components/dashboard/help-tip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SyncLast24HoursButton } from "@/components/dashboard/sync-last-24h-button";
 
 export default async function SourcesPage() {
   const ctx = await getDashboardContext();
@@ -14,7 +15,7 @@ export default async function SourcesPage() {
     <div className="space-y-4 p-6">
       <PageHeading
         title="Data Sources"
-        help="A pairing is one Search Console site plus one GA4 property. Data is stored per signed-in user. Click Sync in the header to refresh the selected date range from Google."
+        help="A pairing is one Search Console site plus one GA4 property. Data is stored per signed-in user. Download the last 24 hours to pull fresh Search Console and GA4 rows for the selected pair."
       />
 
       <div className="flex items-center gap-2">
@@ -23,6 +24,15 @@ export default async function SourcesPage() {
           {info.mode}
         </Badge>
       </div>
+
+      {mapping && info.mode === "live" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Pull yesterday and today from Search Console and GA4 for this pairing.
+          </p>
+          <SyncLast24HoursButton size="sm" />
+        </div>
+      ) : null}
 
       {mapping ? (
         <div className="grid gap-3 md:grid-cols-2">

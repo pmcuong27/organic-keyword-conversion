@@ -1,11 +1,28 @@
 import { formatDateKey } from "./normalize";
 import type { Ga4Row } from "./attribution";
 
+function parseGa4DateHour(raw: string): { date: string; hour: string | null } {
+  if (raw.length >= 10) {
+    return {
+      date: `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`,
+      hour: raw.slice(8, 10),
+    };
+  }
+  if (raw.length === 8) {
+    return {
+      date: `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`,
+      hour: null,
+    };
+  }
+  return { date: formatDateKey(new Date()), hour: null };
+}
+
 export async function fetchGa4OrganicConversions(params: {
   accessToken: string;
   propertyId: string;
   startDate: string;
   endDate: string;
+  hourly?: boolean;
 }): Promise<Ga4Row[]> {
   const property = params.propertyId.startsWith("properties/")
     ? params.propertyId
@@ -14,18 +31,27 @@ export async function fetchGa4OrganicConversions(params: {
   const rows: Ga4Row[] = [];
   let offset = 0;
   const limit = 10000;
+  const hourly = params.hourly ?? false;
 
   while (true) {
     const body = {
       dateRanges: [{ startDate: params.startDate, endDate: params.endDate }],
-      dimensions: [
-        { name: "date" },
-        { name: "landingPagePlusQueryString" },
-        { name: "eventName" },
-        { name: "sessionDefaultChannelGroup" },
-      ],
+      dimensions: hourly
+        ? [
+            { name: "dateHour" },
+            { name: "landingPagePlusQueryString" },
+            { name: "eventName" },
+            { name: "sessionDefaultChannelGroup" },
+          ]
+        : [
+            { name: "date" },
+            { name: "landingPagePlusQueryString" },
+            { name: "eventName" },
+            { name: "sessionDefaultChannelGroup" },
+          ],
       metrics: [
         { name: "sessions" },
+        { name: "eventCount" },
         { name: "keyEvents" },
         { name: "eventValue" },
       ],
@@ -68,20 +94,28 @@ export async function fetchGa4OrganicConversions(params: {
     for (const r of batch) {
       const dims = r.dimensionValues.map((d) => d.value);
       const mets = r.metricValues.map((m) => m.value);
-      const rawDate = dims[0] ?? ""; // YYYYMMDD
-      const date =
-        rawDate.length === 8
-          ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
-          : formatDateKey(new Date());
+      const parsed = hourly ? parseGa4DateHour(dims[0] ?? "") : parseGa4DateHour(dims[0] ?? "");
+      const date = parsed.date;
+      const hour = hourly ? parsed.hour : null;
+      const landingIdx = 1;
+      const eventIdx = 2;
+      const channelIdx = 3;
+
+      const eventCount = Number(mets[1] || 0);
+      const keyEvents = Number(mets[2] || 0);
+      if (!eventCount && !keyEvents) continue;
 
       rows.push({
         date,
-        landingPage: dims[1] || "/",
-        eventName: dims[2] || "(not set)",
-        channelGroup: dims[3] || "Organic Search",
+        hour,
+        landingPage: dims[landingIdx] || "/",
+        eventName: dims[eventIdx] || "(not set)",
+        channelGroup: dims[channelIdx] || "Organic Search",
         sessions: Number(mets[0] || 0),
-        conversions: Number(mets[1] || 0),
-        eventValue: Number(mets[2] || 0),
+        eventCount,
+        conversions: keyEvents,
+        eventValue: Number(mets[3] || 0),
+        isKeyEvent: keyEvents > 0,
       });
     }
 

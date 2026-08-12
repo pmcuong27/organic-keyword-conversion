@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isDemoMode } from "@/lib/app-mode";
+import { isDemoMode, isGoogleOAuthConfigured } from "@/lib/app-mode";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/app/actions/account";
 
@@ -19,8 +19,9 @@ export default function HomePage() {
           Attribute organic keywords to real GA4 conversions
         </h1>
         <p className="mx-auto max-w-xl text-muted-foreground">
-          Sign in with Google, then pick a Search Console site and a GA4 property.
-          No Cloud API setup on your side.
+          {isGoogleOAuthConfigured()
+            ? "Sign in with Google, then pick a Search Console site and a GA4 property. You do not need your own Cloud project."
+            : "This copy of the app has no Google OAuth client configured yet, so Sign in with Google is unavailable."}
         </p>
       </div>
       <div className="flex gap-3">
