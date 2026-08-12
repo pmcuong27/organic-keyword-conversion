@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ConfidenceLevel, QueryMappingBucket } from "@/lib/data-blending";
+import { HelpTip } from "@/components/dashboard/help-tip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,8 +72,12 @@ export function QueryMappingPanel({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <CardTitle className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Shared key-event buckets
+              <HelpTip label="About shared key-event buckets">
+                Count of landing-page × time windows that have both competing keywords and at least
+                one GA4 key event.
+              </HelpTip>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums">
@@ -81,8 +86,13 @@ export function QueryMappingPanel({
         </Card>
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <CardTitle className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Multi-page journeys
+              <HelpTip label="About multi-page journeys">
+                Sessions that land on one URL and fire the key event on another (for example
+                /features → /thank-you). Keywords still attach to the landing page, not the
+                thank-you URL.
+              </HelpTip>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums text-accent">
@@ -94,8 +104,12 @@ export function QueryMappingPanel({
         </Card>
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <CardTitle className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               High-confidence mappings
+              <HelpTip label="About high-confidence mappings">
+                Keyword mappings scoring 70% or higher. Score mixes click share, how unique the
+                keyword is on that page, and device/country overlap with converting sessions.
+              </HelpTip>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums text-primary">
@@ -104,8 +118,12 @@ export function QueryMappingPanel({
         </Card>
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <CardTitle className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Shared key events pool
+              <HelpTip label="About shared key events">
+                Total GA4 key events in crowded buckets. Several keywords may share the same events
+                in that window.
+              </HelpTip>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums">
@@ -113,24 +131,6 @@ export function QueryMappingPanel({
           </CardContent>
         </Card>
       </div>
-
-      <Card className="shadow-none border-primary/30 bg-secondary/30">
-        <CardContent className="space-y-2 py-4 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">How multi-page conversions are mapped</p>
-          <p>
-            Example journey: organic → <span className="text-foreground">/kitchen-design</span> →
-            /contact → <span className="text-foreground">/thank-you</span> (key event).
-          </p>
-          <p>
-            Keywords join on the <span className="font-medium text-foreground">session landing page</span>{" "}
-            (GSC page = GA4 landingPage), not the thank-you URL. The conversion page is shown as
-            journey context. Session/cookie IDs still cannot bridge GSC ↔ GA4.
-          </p>
-          <p className="text-xs">
-            Confidence = 45% click share + 25% uniqueness + 15% device overlap + 15% country overlap
-          </p>
-        </CardContent>
-      </Card>
 
       <div className="flex flex-wrap items-center gap-2">
         <Input

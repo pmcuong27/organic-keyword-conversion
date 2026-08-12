@@ -21,13 +21,7 @@ import {
 } from "./offline-db";
 import { dataSourceMode, isDemoMode, useOfflineDb } from "@/lib/app-mode";
 import { readCachedMappingSources } from "./sync";
-
-function dateKeys(from: Date, to: Date) {
-  return {
-    fromKey: from.toISOString().slice(0, 10),
-    toKey: to.toISOString().slice(0, 10),
-  };
-}
+import { toDateKey } from "@/lib/range";
 
 function mapCachedAttribution(r: {
   date: Date;
@@ -66,11 +60,11 @@ function mapCachedAttribution(r: {
 
 export async function getAttributionRows(params: {
   propertyId?: string | null;
-  userId?: string | null;
   from: Date;
   to: Date;
 }): Promise<KeywordAttributionRow[]> {
-  const { fromKey, toKey } = dateKeys(params.from, params.to);
+  const fromKey = toDateKey(params.from);
+  const toKey = toDateKey(params.to);
 
   if (isDemoMode()) {
     const { gsc, ga4 } = getDemoSourceRows(30);
@@ -102,7 +96,6 @@ export async function getAttributionRows(params: {
 
 export async function getOverviewStats(params: {
   propertyId?: string | null;
-  userId?: string | null;
   from: Date;
   to: Date;
 }) {
@@ -117,13 +110,13 @@ export async function getOverviewStats(params: {
 
 export async function getQueryMappingAnalysis(params: {
   propertyId?: string | null;
-  userId?: string | null;
   from: Date;
   to: Date;
   crowdedOnly?: boolean;
   withKeyEventsOnly?: boolean;
 }): Promise<{ buckets: QueryMappingBucket[]; summary: ReturnType<typeof summarizeMapping> }> {
-  const { fromKey, toKey } = dateKeys(params.from, params.to);
+  const fromKey = toDateKey(params.from);
+  const toKey = toDateKey(params.to);
 
   let gsc: GscMappingRow[] = [];
   let ga4: Ga4MappingRow[] = [];

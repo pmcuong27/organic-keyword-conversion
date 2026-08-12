@@ -48,8 +48,8 @@ export default async function OnboardingPage() {
               {gscSites.length === 0
                 ? "No Search Console sites were returned for this Google account."
                 : "No GA4 properties were returned for this Google account."}{" "}
-              Confirm the account is a user on both properties, and that Search Console
-              API, Analytics Admin API, and Analytics Data API are enabled in Google Cloud.
+              Ask an admin to add this Google account as a user on the site/property.
+              You do not need to enable Google Cloud APIs yourself.
             </p>
           ) : null}
           <ConnectAccountsForm gscSites={gscSites} ga4Properties={ga4Properties} />

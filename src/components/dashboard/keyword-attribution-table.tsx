@@ -14,6 +14,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { Download, SlidersHorizontal } from "lucide-react";
 import type { KeywordAttributionRow } from "@/lib/data-blending";
+import { HelpTip } from "@/components/dashboard/help-tip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -155,7 +156,15 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "organicConversions",
-        header: "GA4 Organic Conv.",
+        header: () => (
+          <span className="inline-flex items-center gap-1">
+            GA4 Organic Conv.
+            <HelpTip label="About GA4 organic conversions">
+              Key events on this landing page from Organic Search, before they are split across
+              keywords.
+            </HelpTip>
+          </span>
+        ),
         cell: ({ getValue }) => (
           <span className="tabular-nums">{Number(getValue()).toFixed(2)}</span>
         ),
@@ -163,7 +172,14 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "estimatedConversions",
-        header: "Est. Conversions",
+        header: () => (
+          <span className="inline-flex items-center gap-1">
+            Est. Conversions
+            <HelpTip label="About estimated conversions">
+              Page key events × this keyword&apos;s share of clicks on that page and day.
+            </HelpTip>
+          </span>
+        ),
         cell: ({ getValue }) => (
           <span className="tabular-nums font-semibold text-primary">
             {Number(getValue()).toFixed(3)}
@@ -173,7 +189,14 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "estimatedConvRate",
-        header: "Est. Conv. Rate",
+        header: () => (
+          <span className="inline-flex items-center gap-1">
+            Est. Conv. Rate
+            <HelpTip label="About estimated conversion rate">
+              Estimated conversions divided by GSC clicks for this keyword.
+            </HelpTip>
+          </span>
+        ),
         cell: ({ getValue }) => (
           <span className="tabular-nums">{(Number(getValue()) * 100).toFixed(2)}%</span>
         ),

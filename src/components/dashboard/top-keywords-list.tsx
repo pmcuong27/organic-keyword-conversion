@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTip } from "@/components/dashboard/help-tip";
 
 export function TopKeywordsList({
   items,
@@ -8,7 +9,13 @@ export function TopKeywordsList({
   return (
     <Card className="shadow-none">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Top Keywords</CardTitle>
+        <CardTitle className="flex items-center gap-1 text-sm font-medium">
+          Top Keywords
+          <HelpTip label="About top keywords">
+            Ranked by estimated organic conversions. The number on the right is that estimate, not
+            raw GA4 sessions.
+          </HelpTip>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {items.map((item, idx) => (

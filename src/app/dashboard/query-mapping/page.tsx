@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getQueryMappingAnalysis } from "@/lib/data-blending";
 import { getDashboardContext } from "@/lib/dashboard-context";
 import { rangeToDates } from "@/lib/range";
+import { PageHeading } from "@/components/dashboard/help-tip";
 import { QueryMappingPanel } from "@/components/dashboard/query-mapping-panel";
 import { DashboardSkeleton } from "@/components/dashboard/skeletons";
 
@@ -10,7 +11,6 @@ async function MappingContent({ range }: { range: string }) {
   const ctx = await getDashboardContext();
   const { buckets, summary } = await getQueryMappingAnalysis({
     propertyId: ctx.property?.id ?? null,
-    userId: ctx.userId,
     from,
     to,
     crowdedOnly: false,
@@ -19,14 +19,10 @@ async function MappingContent({ range }: { range: string }) {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Query Mapping Analysis</h1>
-        <p className="text-sm text-muted-foreground">
-          Keywords join the session <span className="text-foreground">landing page</span>, even when
-          the key event fires later on Contact / Thank You. Toggle multi-page journeys to inspect
-          those paths.
-        </p>
-      </div>
+      <PageHeading
+        title="Query Mapping Analysis"
+        help="When several keywords share a landing page in the same window, they also share that page's key events. Keywords join on the session landing page, even if the event fires later on Contact or Thank You. Confidence = 45% click share + 25% uniqueness + 15% device overlap + 15% country overlap. GSC and GA4 still cannot share a session or cookie id."
+      />
       <QueryMappingPanel buckets={buckets} summary={summary} />
     </div>
   );

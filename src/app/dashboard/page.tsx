@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getOverviewStats } from "@/lib/data-blending";
 import { getDashboardContext } from "@/lib/dashboard-context";
 import { rangeToDates } from "@/lib/range";
+import { PageHeading } from "@/components/dashboard/help-tip";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PerformanceChart } from "@/components/dashboard/performance-chart";
 import { TopKeywordsList } from "@/components/dashboard/top-keywords-list";
@@ -12,19 +13,20 @@ async function OverviewContent({ range }: { range: string }) {
   const ctx = await getDashboardContext();
   const stats = await getOverviewStats({
     propertyId: ctx.property?.id ?? null,
-    userId: ctx.userId,
     from,
     to,
   });
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted-foreground">
-          Organic keyword performance blended with GA4 conversions
-          {ctx.property ? ` · ${ctx.property.name}` : ""}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PageHeading
+          title="Overview"
+          help="GSC clicks and impressions are joined to GA4 organic key events on the same landing page and day. Estimated conversions are the page's key events weighted by each keyword's share of clicks. Click Sync after you pair a Search Console site with a GA4 property."
+        />
+        {ctx.property ? (
+          <p className="text-xs text-muted-foreground">{ctx.property.name}</p>
+        ) : null}
       </div>
 
       {stats.rowCount === 0 ? (
@@ -39,11 +41,13 @@ async function OverviewContent({ range }: { range: string }) {
           title="Organic Clicks"
           value={stats.totalClicks.toLocaleString()}
           hint={`${stats.totalImpressions.toLocaleString()} impressions`}
+          help="Sum of Google Search Console clicks for the selected range, after landing-page URLs are normalized."
         />
         <KpiCard
           title="Est. Organic Conversions"
           value={stats.totalEstConversions.toFixed(1)}
           hint={`Avg CTR ${(stats.avgCtr * 100).toFixed(1)}%`}
+          help="GA4 organic key events on each landing page, allocated to keywords by click share. This is an estimate, not a session-level match."
         />
         <KpiCard
           title="Top Converting Keyword"
@@ -53,6 +57,7 @@ async function OverviewContent({ range }: { range: string }) {
               ? `${stats.topKeyword.conversions.toFixed(2)} est. conv · ${stats.topKeyword.clicks} clicks`
               : undefined
           }
+          help="Keyword with the highest estimated organic conversions in this range."
         />
         <KpiCard
           title="Top Converting Landing Page"
@@ -62,6 +67,7 @@ async function OverviewContent({ range }: { range: string }) {
               ? `${stats.topPage.conversions.toFixed(2)} est. conv · ${stats.topPage.clicks} clicks`
               : undefined
           }
+          help="Landing page with the highest estimated organic conversions. GSC page URLs and GA4 landing pages are matched after stripping hosts and trailing slashes."
         />
       </div>
 

@@ -219,7 +219,6 @@ export function offlineDbStats() {
         )
         .get() as { n: number; min_h: string | null; max_h: string | null };
       return {
-        path: resolveOfflineDbPath(),
         gscRows: gsc.n,
         ga4Rows: ga4.n,
         gscRange: { min: gsc.min_h, max: gsc.max_h },
@@ -228,7 +227,9 @@ export function offlineDbStats() {
     } finally {
       db.close();
     }
-  } catch (err) {
-    return { path: resolveOfflineDbPath(), error: String(err) };
+  } catch {
+    return { error: "Offline database is missing or unreadable." };
   }
 }
+
+export type OfflineDbStats = ReturnType<typeof offlineDbStats>;

@@ -1,5 +1,6 @@
 import { getDataSourceInfo } from "@/lib/data-blending";
 import { getDashboardContext } from "@/lib/dashboard-context";
+import { PageHeading } from "@/components/dashboard/help-tip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -7,24 +8,14 @@ export default async function SourcesPage() {
   const ctx = await getDashboardContext();
   const info = await getDataSourceInfo(ctx.property?.id ?? null);
   const mapping = info.mapping;
-  const offline = info.offline as {
-    path?: string;
-    gscRows?: number;
-    ga4Rows?: number;
-    gscRange?: { min: string | null; max: string | null };
-    ga4Range?: { min: string | null; max: string | null };
-    error?: string;
-  } | null;
+  const offline = info.offline;
 
   return (
     <div className="space-y-4 p-6">
-      <div>
-        <h1 className="text-lg font-semibold">Data Sources</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Blend any Search Console site with any GA4 property the signed-in Google account
-          can access. Pairings are stored per user.
-        </p>
-      </div>
+      <PageHeading
+        title="Data Sources"
+        help="A pairing is one Search Console site plus one GA4 property. Data is stored per signed-in user. Click Sync in the header to refresh the selected date range from Google."
+      />
 
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">Mode</span>
@@ -83,7 +74,7 @@ export default async function SourcesPage() {
               <p className="text-sm text-destructive">{offline.error}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Optional local SQLite path for development only. Do not commit this file.
+                Local SQLite is for development only and is not used in hosted live mode.
               </p>
             )}
           </CardContent>

@@ -4,6 +4,7 @@ import { getGoogleAccessToken } from "@/lib/google-token";
 import { listGa4Properties } from "@/lib/data-blending/ga4";
 import { listGscSites } from "@/lib/data-blending/gsc";
 import { listUserProperties } from "@/lib/properties";
+import { PageHeading } from "@/components/dashboard/help-tip";
 import { ConnectAccountsForm } from "@/components/dashboard/connect-accounts-form";
 import { deletePropertyAction } from "@/app/actions/account";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,10 @@ export default async function SettingsPage() {
   if (isDemoMode()) {
     return (
       <div className="space-y-3 p-6">
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Demo mode uses sample data. Set <code>DEMO_MODE=false</code> and configure Google
-          OAuth to pair real Search Console and GA4 accounts.
-        </p>
+        <PageHeading
+          title="Settings"
+          help="Demo mode uses sample data only. Set DEMO_MODE=false and add Google OAuth credentials on the server to pair real accounts."
+        />
       </div>
     );
   }
@@ -25,11 +25,10 @@ export default async function SettingsPage() {
   if (!isLiveGoogleMode()) {
     return (
       <div className="space-y-3 p-6">
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Offline SQLite mode is active. Disable <code>USE_OFFLINE_DB</code> to connect live
-          Google accounts.
-        </p>
+        <PageHeading
+          title="Settings"
+          help="Offline SQLite mode reads a local exporter database. Turn USE_OFFLINE_DB off to connect live Google accounts."
+        />
       </div>
     );
   }
@@ -59,13 +58,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Each pairing blends one Search Console site with one GA4 property. Add as many
-          client or brand pairs as this Google account can access.
-        </p>
-      </div>
+      <PageHeading
+        title="Settings"
+        help="Each pairing blends one Search Console site with one GA4 property. Add as many client or brand pairs as this Google account can access. The signed-in account must already be a user on both."
+      />
 
       <Card className="shadow-none">
         <CardHeader className="pb-2">

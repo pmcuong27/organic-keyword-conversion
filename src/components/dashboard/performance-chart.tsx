@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTip } from "@/components/dashboard/help-tip";
 
 export function PerformanceChart({
   data,
@@ -20,7 +21,13 @@ export function PerformanceChart({
   return (
     <Card className="shadow-none">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Organic Clicks vs Estimated Conversions</CardTitle>
+        <CardTitle className="flex items-center gap-1 text-sm font-medium">
+          Organic Clicks vs Estimated Conversions
+          <HelpTip label="About this chart">
+            Left axis is Search Console clicks by day. Right axis is estimated organic conversions
+            allocated to keywords on those days.
+          </HelpTip>
+        </CardTitle>
       </CardHeader>
       <CardContent className="h-[300px] pt-2">
         <ResponsiveContainer width="100%" height="100%">

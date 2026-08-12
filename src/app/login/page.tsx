@@ -11,8 +11,8 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>Sign in to BlendAttrib</CardTitle>
           <CardDescription>
-            Connect Google with Search Console and Analytics read access. You can pair any
-            GSC site with any GA4 property that this account can open.
+            Sign in with Google. We only request read access to Search Console and
+            Analytics. You do not need a Google Cloud project.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

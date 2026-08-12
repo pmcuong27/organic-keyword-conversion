@@ -2,6 +2,19 @@
 
 Blend Google Search Console queries with GA4 organic conversions. Pair **any** Search Console site with **any** GA4 property the signed-in Google account can access.
 
+## Who does what
+
+**People using the hosted app** only sign in with Google. They do **not** create a Cloud project or enable APIs.
+
+They need:
+
+- A Google account
+- Permission on the Search Console site(s) they want to blend
+- Permission on the GA4 property(ies) they want to blend (invite the same email on both if they live in different orgs)
+- To approve read access when Google shows the consent screen
+
+**You (the person who deploys this repo)** enable the APIs once on *your* Google Cloud project. The app then calls those APIs with each user's OAuth token.
+
 ## Try the UI (no Google account)
 
 ```bash
@@ -12,47 +25,46 @@ npm run dev
 
 `DEMO_MODE=true` serves generic sample data at http://localhost:3000
 
-## Live Google accounts
+## Deploy once (app operator)
 
-The Google account you sign in with must have access to **both** the Search Console site and the GA4 property you want to blend. If they live in different organizations, invite that same user on both properties.
+Do this on the Cloud project that owns the OAuth client — not on each user's account.
 
-1. Create a Google Cloud project and enable:
+1. Enable in [Google Cloud Console](https://console.cloud.google.com/apis/library):
    - Google Search Console API
    - Google Analytics Admin API
    - Google Analytics Data API
-2. Create an OAuth **Web** client. Add authorized redirect URI:
+2. Configure the OAuth consent screen (External).
+3. Create an OAuth **Web** client. Authorized redirect URIs:
    - `http://localhost:3000/api/auth/callback/google`
-   - plus your production origin, e.g. `https://your-domain/api/auth/callback/google`
-3. If the OAuth app is in Testing, add each user under **Audience → Test users**.
-4. Start Postgres and configure env:
+   - `https://your-domain/api/auth/callback/google`
+4. Put the client id/secret in the server `.env` (never in the browser, never in git).
+5. **Testing vs Production**
+   - **Testing:** only emails listed as Test users can sign in. Fine for you and a few teammates.
+   - **Anyone can click Sign in:** set the consent screen to **In production** and complete [Google's OAuth verification](https://support.google.com/cloud/answer/13463374) for `webmasters.readonly` and `analytics.readonly`. Those are sensitive scopes; unverified apps stay limited to test users.
+
+Then run Postgres and the app:
 
 ```bash
 npm run db:up
 cp .env.example .env
 ```
 
-Set in `.env`:
-
 ```
 DEMO_MODE="false"
 USE_OFFLINE_DB="false"
 DATABASE_URL="postgresql://blend:blend@localhost:5432/gsc_ga4_blend?schema=public"
 AUTH_SECRET="replace-with-a-long-random-string"
-AUTH_URL="http://localhost:3000"
+AUTH_URL="https://your-domain"
 GOOGLE_CLIENT_ID="...."
 GOOGLE_CLIENT_SECRET="...."
 ```
-
-5. Push the schema and run:
 
 ```bash
 npm run db:push
 npm run dev
 ```
 
-6. Sign in with Google, then pick one GSC site and one GA4 property. Add more pairings in **Settings** (agencies / multiple brands).
-
-Use **Sync** in the header to refresh the selected date range from Google.
+After deploy, users: **Sign in with Google → pick a GSC site and a GA4 property → Sync**.
 
 ## What this app does not do
 

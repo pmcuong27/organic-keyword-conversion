@@ -19,8 +19,8 @@ export default function HomePage() {
           Attribute organic keywords to real GA4 conversions
         </h1>
         <p className="mx-auto max-w-xl text-muted-foreground">
-          Sign in with Google, then pair any Search Console site with any GA4 property
-          that account can access.
+          Sign in with Google, then pick a Search Console site and a GA4 property.
+          No Cloud API setup on your side.
         </p>
       </div>
       <div className="flex gap-3">

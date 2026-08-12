@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CommandMenu } from "@/components/dashboard/command-menu";
+import { HelpTip } from "@/components/dashboard/help-tip";
 import { selectPropertyAction, syncSelectedPropertyAction } from "@/app/actions/account";
 import type { PropertyOption } from "@/lib/properties";
 
@@ -155,6 +156,13 @@ export function AppHeader({
           >
             {dataMode}
           </Badge>
+          <HelpTip label="About data mode">
+            {dataMode === "live"
+              ? "Live mode reads Search Console and GA4 for the selected pairing using the signed-in Google account."
+              : dataMode === "demo"
+                ? "Demo mode shows sample data so you can explore the UI without Google."
+                : "Offline mode reads a local SQLite export. It is for development, not hosted users."}
+          </HelpTip>
           <Badge variant="secondary" className="gap-1.5 font-normal">
             <RefreshCw className={`size-3 ${pending ? "animate-spin" : ""}`} />
             {syncLabel}

@@ -72,7 +72,7 @@ export type QueryMappingBucket = {
   }>;
   /**
    * Distinct conversion journeys for this landing×hour bucket.
-   * Example: /kitchen-design → /thank-you (generate_lead)
+   * Example: /features → /thank-you (generate_lead)
    */
   journeys: Array<{
     conversionPage: string;
