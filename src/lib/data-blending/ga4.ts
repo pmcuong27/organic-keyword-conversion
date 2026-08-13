@@ -103,7 +103,8 @@ export async function fetchGa4OrganicConversions(params: {
 
       const eventCount = Number(mets[1] || 0);
       const keyEvents = Number(mets[2] || 0);
-      if (!eventCount && !keyEvents) continue;
+      const sessions = Number(mets[0] || 0);
+      if (!eventCount && !keyEvents && !sessions) continue;
 
       rows.push({
         date,
@@ -111,7 +112,7 @@ export async function fetchGa4OrganicConversions(params: {
         landingPage: dims[landingIdx] || "/",
         eventName: dims[eventIdx] || "(not set)",
         channelGroup: dims[channelIdx] || "Organic Search",
-        sessions: Number(mets[0] || 0),
+        sessions,
         eventCount,
         conversions: keyEvents,
         eventValue: Number(mets[3] || 0),

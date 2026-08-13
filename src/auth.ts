@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import type { JWT } from "next-auth/jwt";
+import { persistGoogleOAuthAccount } from "@/lib/google-account";
+import { prisma } from "@/lib/prisma";
 
 const scopes = [
   "openid",
@@ -82,8 +84,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
           token.refreshToken = account.refresh_token ?? token.refreshToken;
           token.expiresAt =
             account.expires_at ?? Math.floor(Date.now() / 1000) + 3600;
-          token.sub = user?.id ?? token.sub;
+          // Google providerAccountId is stable across sessions (unlike NextAuth's ephemeral user.id).
+          token.sub = account.providerAccountId || user?.id || token.sub;
           token.error = undefined;
+
+          // Persist tokens so the daily cron can sync without a browser session.
+          if (token.sub && account.providerAccountId) {
+            try {
+              const canonicalUserId = await persistGoogleOAuthAccount({
+                userId: String(token.sub),
+                email: user?.email,
+                name: user?.name,
+                image: user?.image,
+                providerAccountId: account.providerAccountId,
+                accessToken: account.access_token,
+                refreshToken: account.refresh_token,
+                expiresAt: account.expires_at,
+                tokenType: account.token_type,
+                scope: account.scope,
+                idToken: account.id_token,
+              });
+              if (canonicalUserId) token.sub = canonicalUserId;
+            } catch (err) {
+              console.error("Failed to persist Google OAuth account", err);
+            }
+          }
+
           return token;
         }
         const expiresAt = Number(token.expiresAt || 0) * 1000;
@@ -94,7 +120,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
       },
       async session({ session, token }) {
         if (session.user) {
-          session.user.id = (token.sub as string) || "google-user";
+          let userId = (token.sub as string) || "google-user";
+          // Reconcile with DB when an older JWT sub no longer matches the email's User row.
+          if (session.user.email) {
+            try {
+              const byEmail = await prisma.user.findUnique({
+                where: { email: session.user.email },
+                select: { id: true },
+              });
+              if (byEmail) userId = byEmail.id;
+            } catch {
+              // Postgres may be down during setup; keep JWT sub.
+            }
+          }
+          session.user.id = userId;
         }
         session.accessToken = token.accessToken as string | undefined;
         session.error = token.error as string | undefined;

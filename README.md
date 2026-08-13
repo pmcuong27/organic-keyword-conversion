@@ -59,6 +59,7 @@ AUTH_SECRET="replace-with-a-long-random-string"
 AUTH_URL="https://your-domain"
 GOOGLE_CLIENT_ID="...."
 GOOGLE_CLIENT_SECRET="...."
+CRON_SECRET="replace-with-a-long-random-string"
 ```
 
 ```bash
@@ -67,6 +68,24 @@ npm run dev
 ```
 
 After deploy, users: **Sign in with Google → pick a GSC site and a GA4 property → Sync**.
+
+## Automatic daily sync
+
+On Vercel, `vercel.json` schedules `GET /api/cron/sync` every day at **06:00 UTC**. That job:
+
+1. Loads every saved GSC × GA4 pairing
+2. Refreshes Google access tokens from the refresh token stored at sign-in
+3. Downloads the last 24 hours of Search Console + GA4 data into Postgres
+
+Set `CRON_SECRET` in the Vercel project env. Vercel sends `Authorization: Bearer $CRON_SECRET`.
+
+Users who signed in before this feature need to **sign out and sign in once** so an offline refresh token is stored.
+
+Local manual run:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/sync
+```
 
 ## What this app does not do
 

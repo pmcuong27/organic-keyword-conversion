@@ -3,40 +3,78 @@ import type { GscRow } from "./attribution";
 
 type Token = { access_token: string };
 
-/** Parse GSC HOUR dimension keys (e.g. 2025-04-07T14:00:00-07:00) to 00–23. */
-export function parseGscHourKey(raw: string | undefined): string | null {
-  if (!raw) return null;
-  const isoMatch = raw.match(/T(\d{2}):/);
-  if (isoMatch) return isoMatch[1];
+/** Parse GSC HOUR dimension keys (e.g. 2025-04-07T14:00:00-07:00). */
+export function parseGscHourDimension(raw: string | undefined): {
+  date: string;
+  hour: string | null;
+} {
+  if (!raw) {
+    return { date: formatDateKey(new Date()), hour: null };
+  }
+
+  // ISO datetime from HOUR dimension (Pacific offset)
+  const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
+  if (isoMatch) {
+    return { date: isoMatch[1], hour: isoMatch[2] };
+  }
+
+  // Plain date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return { date: raw, hour: null };
+  }
+
   const n = Number(raw);
   if (Number.isFinite(n)) {
-    return String(Math.max(0, Math.min(23, Math.floor(n)))).padStart(2, "0");
+    return {
+      date: formatDateKey(new Date()),
+      hour: String(Math.max(0, Math.min(23, Math.floor(n)))).padStart(2, "0"),
+    };
   }
-  return raw.slice(0, 2).padStart(2, "0");
+
+  return {
+    date: formatDateKey(new Date()),
+    hour: raw.slice(0, 2).padStart(2, "0"),
+  };
 }
 
-export async function fetchGscSearchAnalytics(params: {
+/** @deprecated use parseGscHourDimension */
+export function parseGscHourKey(raw: string | undefined): string | null {
+  return parseGscHourDimension(raw).hour;
+}
+
+async function queryGsc(params: {
   accessToken: string;
   siteUrl: string;
   startDate: string;
   endDate: string;
-  hourly?: boolean;
-}): Promise<GscRow[]> {
-  const rows: GscRow[] = [];
+  dimensions: string[];
+  dataState: string;
+}): Promise<
+  Array<{
+    keys: string[];
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }>
+> {
+  const rows: Array<{
+    keys: string[];
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }> = [];
   let startRow = 0;
   const rowLimit = 25000;
-  const hourly = params.hourly ?? false;
-  const dimensions = hourly
-    ? ["date", "hour", "query", "page"]
-    : ["date", "query", "page"];
 
   while (true) {
-    const body: Record<string, unknown> = {
+    const body = {
       startDate: params.startDate,
       endDate: params.endDate,
-      dimensions,
+      dimensions: params.dimensions,
       type: "web",
-      dataState: hourly ? "hourly_all" : "all",
+      dataState: params.dataState,
       rowLimit,
       startRow,
       aggregationType: "auto",
@@ -71,32 +109,7 @@ export async function fetchGscSearchAnalytics(params: {
     };
 
     const batch = json.rows ?? [];
-    for (const r of batch) {
-      if (hourly) {
-        const [date, hourRaw, query, page] = r.keys;
-        rows.push({
-          date: formatDateKey(new Date(`${date}T00:00:00Z`)),
-          hour: parseGscHourKey(hourRaw),
-          query: query ?? "",
-          page: page ?? "/",
-          clicks: r.clicks ?? 0,
-          impressions: r.impressions ?? 0,
-          ctr: r.ctr ?? 0,
-          position: r.position ?? 0,
-        });
-      } else {
-        const [date, query, page] = r.keys;
-        rows.push({
-          date: formatDateKey(new Date(`${date}T00:00:00Z`)),
-          query: query ?? "",
-          page: page ?? "/",
-          clicks: r.clicks ?? 0,
-          impressions: r.impressions ?? 0,
-          ctr: r.ctr ?? 0,
-          position: r.position ?? 0,
-        });
-      }
-    }
+    rows.push(...batch);
 
     if (batch.length < rowLimit) break;
     startRow += rowLimit;
@@ -104,6 +117,72 @@ export async function fetchGscSearchAnalytics(params: {
   }
 
   return rows;
+}
+
+export async function fetchGscSearchAnalytics(params: {
+  accessToken: string;
+  siteUrl: string;
+  startDate: string;
+  endDate: string;
+  hourly?: boolean;
+}): Promise<GscRow[]> {
+  const hourly = params.hourly ?? false;
+
+  if (hourly) {
+    try {
+      // HOUR already embeds the timestamp — do not also group by date (invalid argument).
+      const batch = await queryGsc({
+        accessToken: params.accessToken,
+        siteUrl: params.siteUrl,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        dimensions: ["hour", "query", "page"],
+        dataState: "hourly_all",
+      });
+
+      return batch.map((r) => {
+        const [hourRaw, query, page] = r.keys;
+        const parsed = parseGscHourDimension(hourRaw);
+        return {
+          date: parsed.date,
+          hour: parsed.hour,
+          query: query ?? "",
+          page: page ?? "/",
+          clicks: r.clicks ?? 0,
+          impressions: r.impressions ?? 0,
+          ctr: r.ctr ?? 0,
+          position: r.position ?? 0,
+        };
+      });
+    } catch (err) {
+      console.warn(
+        "Hourly GSC request failed; falling back to daily dimensions",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  const batch = await queryGsc({
+    accessToken: params.accessToken,
+    siteUrl: params.siteUrl,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    dimensions: ["date", "query", "page"],
+    dataState: "all",
+  });
+
+  return batch.map((r) => {
+    const [date, query, page] = r.keys;
+    return {
+      date: formatDateKey(new Date(`${date}T00:00:00Z`)),
+      query: query ?? "",
+      page: page ?? "/",
+      clicks: r.clicks ?? 0,
+      impressions: r.impressions ?? 0,
+      ctr: r.ctr ?? 0,
+      position: r.position ?? 0,
+    };
+  });
 }
 
 export async function listGscSites(accessToken: string): Promise<string[]> {

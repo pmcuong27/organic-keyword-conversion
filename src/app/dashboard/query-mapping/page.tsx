@@ -21,7 +21,7 @@ async function MappingContent({ range }: { range: string }) {
     <div className="space-y-4 p-4 md:p-6">
       <PageHeading
         title="Query Mapping Analysis"
-        help="When several keywords share a landing page in the same window, they also share that page's key events. Keywords join on the session landing page, even if the event fires later on Contact or Thank You. Confidence = 45% click share + 25% uniqueness + 15% device overlap + 15% country overlap. GSC and GA4 still cannot share a session or cookie id."
+        help="Keywords map to a landing page in the same hour only when Search Console recorded a click and GA4 recorded Organic Search visitors on that page. Impression-only queries are ignored. Key events in that hour×page window are then shared by click share. GSC and GA4 still cannot share a session or cookie id."
       />
       <QueryMappingPanel buckets={buckets} summary={summary} />
     </div>

@@ -15,7 +15,7 @@ export default async function SourcesPage() {
     <div className="space-y-4 p-6">
       <PageHeading
         title="Data Sources"
-        help="A pairing is one Search Console site plus one GA4 property. Data is stored per signed-in user. Download the last 24 hours to pull fresh Search Console and GA4 rows for the selected pair."
+        help="A pairing is one Search Console site plus one GA4 property. Data is stored per signed-in user. Manual download pulls the last 24 hours now; a daily cron also syncs every saved pairing automatically."
       />
 
       <div className="flex items-center gap-2">
@@ -87,6 +87,24 @@ export default async function SourcesPage() {
                 Local SQLite is for development only and is not used in hosted live mode.
               </p>
             )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {info.mode === "live" ? (
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Automatic daily sync</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              Every day at 06:00 UTC the app syncs the last 24 hours of Search Console and GA4
+              data for each saved pairing and stores it in Postgres.
+            </p>
+            <p>
+              Requires a Google sign-in that granted offline access (refresh token). If automatic
+              sync fails after an upgrade, sign out and sign in once.
+            </p>
           </CardContent>
         </Card>
       ) : null}

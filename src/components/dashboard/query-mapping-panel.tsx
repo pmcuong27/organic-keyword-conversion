@@ -73,15 +73,15 @@ export function QueryMappingPanel({
         <Card className="shadow-none">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Shared key-event buckets
-              <HelpTip label="About shared key-event buckets">
-                Count of landing-page × time windows that have both competing keywords and at least
-                one GA4 key event.
+              Shared click+traffic buckets
+              <HelpTip label="About shared click+traffic buckets">
+                Landing page × hour windows where Search Console recorded a click and GA4 recorded
+                Organic Search visitors on that same page. Keywords without clicks are excluded.
               </HelpTip>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums">
-            {summary.bucketsWithKeyEvents}
+            {summary.bucketCount}
           </CardContent>
         </Card>
         <Card className="shadow-none">
@@ -180,7 +180,7 @@ export function QueryMappingPanel({
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {bucket.date} · {formatHour(bucket.hour)} · {bucket.keywordCount} keywords ·{" "}
-                  {bucket.totalClicks} clicks
+                  {bucket.totalClicks} clicks · {bucket.sessions} organic sessions
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -192,6 +192,9 @@ export function QueryMappingPanel({
                     {(bucket.multiPageShare * 100).toFixed(0)}% off-landing
                   </Badge>
                 )}
+                <Badge variant="secondary">
+                  {bucket.sessions} organic sessions
+                </Badge>
                 <Badge className="bg-accent text-accent-foreground hover:bg-accent">
                   {bucket.keyEvents} key events
                 </Badge>
@@ -256,7 +259,8 @@ export function QueryMappingPanel({
         ))}
         {!filtered.length && (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            No competing keyword buckets in this range.
+            No hour × landing buckets where Search Console recorded a click and GA4 recorded
+            Organic Search visitors.
           </p>
         )}
       </div>
@@ -268,13 +272,21 @@ export function QueryMappingPanel({
               {selected?.landingPage}
             </SheetTitle>
             <SheetDescription>
-              {selected?.date} · {formatHour(selected?.hour ?? null)} · shared conversion pool
+              {selected?.date} · {formatHour(selected?.hour ?? null)} · click + Organic Search traffic
             </SheetDescription>
           </SheetHeader>
 
           {selected && (
             <div className="mt-6 space-y-5 px-1">
               <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Organic Search sessions</p>
+                  <p className="text-lg font-semibold tabular-nums">{selected.sessions}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">GSC clicks in window</p>
+                  <p className="text-lg font-semibold tabular-nums">{selected.totalClicks}</p>
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Key events in window</p>
                   <p className="text-lg font-semibold tabular-nums text-accent">
@@ -322,7 +334,7 @@ export function QueryMappingPanel({
 
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  GA4 events in this hour×landing
+                  GA4 events in this hour × landing
                 </p>
                 <div className="space-y-1.5">
                   {selected.eventBreakdown.map((ev) => (

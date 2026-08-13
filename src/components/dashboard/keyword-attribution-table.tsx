@@ -34,6 +34,13 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    help?: React.ReactNode;
+  }
+}
+
 function exportCsv(rows: KeywordAttributionRow[]) {
   const headers = [
     "date",
@@ -156,15 +163,15 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "organicConversions",
-        header: () => (
-          <span className="inline-flex items-center gap-1">
-            GA4 Organic Conv.
+        header: "GA4 Organic Conv.",
+        meta: {
+          help: (
             <HelpTip label="About GA4 organic conversions">
               Key events on this landing page from Organic Search, before they are split across
               keywords.
             </HelpTip>
-          </span>
-        ),
+          ),
+        },
         cell: ({ getValue }) => (
           <span className="tabular-nums">{Number(getValue()).toFixed(2)}</span>
         ),
@@ -172,14 +179,14 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "estimatedConversions",
-        header: () => (
-          <span className="inline-flex items-center gap-1">
-            Est. Conversions
+        header: "Est. Conversions",
+        meta: {
+          help: (
             <HelpTip label="About estimated conversions">
               Page key events × this keyword&apos;s share of clicks on that page and day.
             </HelpTip>
-          </span>
-        ),
+          ),
+        },
         cell: ({ getValue }) => (
           <span className="tabular-nums font-semibold text-primary">
             {Number(getValue()).toFixed(3)}
@@ -189,14 +196,14 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
       },
       {
         accessorKey: "estimatedConvRate",
-        header: () => (
-          <span className="inline-flex items-center gap-1">
-            Est. Conv. Rate
+        header: "Est. Conv. Rate",
+        meta: {
+          help: (
             <HelpTip label="About estimated conversion rate">
               Estimated conversions divided by GSC clicks for this keyword.
             </HelpTip>
-          </span>
-        ),
+          ),
+        },
         cell: ({ getValue }) => (
           <span className="tabular-nums">{(Number(getValue()) * 100).toFixed(2)}%</span>
         ),
@@ -322,14 +329,20 @@ export function KeywordAttributionTable({ data }: { data: KeywordAttributionRow[
         >
           {table.getHeaderGroups().map((hg) =>
             hg.headers.map((header) => (
-              <button
+              <div
                 key={header.id}
-                className="px-3 py-2.5 text-left hover:text-foreground"
-                onClick={header.column.getToggleSortingHandler()}
+                className="flex items-center gap-1 px-3 py-2.5 text-left"
               >
-                {flexRender(header.column.columnDef.header, header.getContext())}
-                {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? null}
-              </button>
+                <button
+                  type="button"
+                  className="min-w-0 text-left hover:text-foreground"
+                  onClick={header.column.getToggleSortingHandler()}
+                >
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {{ asc: " ↑", desc: " ↓" }[header.column.getIsSorted() as string] ?? null}
+                </button>
+                {header.column.columnDef.meta?.help}
+              </div>
             )),
           )}
         </div>

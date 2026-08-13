@@ -9,7 +9,7 @@ const envFile = path.join(root, ".env");
 const APP_DB = "gsc_ga4_blend";
 const PRISMA_INSTANCE = "default";
 const DOCKER_URL =
-  "postgresql://blend:blend@localhost:5432/gsc_ga4_blend?schema=public";
+  "postgresql://blend:blend@127.0.0.1:5432/gsc_ga4_blend?schema=public";
 
 function quoteEnv(value) {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -45,6 +45,17 @@ function redact(url) {
     return `${parsed.protocol}//${parsed.hostname}:${parsed.port || "5432"}${parsed.pathname}`;
   } catch {
     return "(invalid DATABASE_URL)";
+  }
+}
+
+function preferIpv4(url) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost") parsed.hostname = "127.0.0.1";
+    return parsed.toString();
+  } catch {
+    return url;
   }
 }
 
@@ -111,9 +122,10 @@ async function ensureAppDatabase(adminUrl) {
     await admin.end();
   }
 
-  const parsed = new URL(adminUrl);
+  const parsed = new URL(preferIpv4(adminUrl));
   parsed.pathname = `/${APP_DB}`;
   parsed.searchParams.set("schema", "public");
+  parsed.searchParams.set("pgbouncer", "true");
   if (!parsed.searchParams.get("sslmode")) parsed.searchParams.set("sslmode", "disable");
   return parsed.toString();
 }
@@ -127,9 +139,10 @@ async function main() {
   }
 
   const envText = existsSync(envFile) ? readFileSync(envFile, "utf8") : "";
-  const current = getEnvValue(envText, "DATABASE_URL");
+  const current = preferIpv4(getEnvValue(envText, "DATABASE_URL"));
 
   if (await canConnect(current)) {
+    upsertEnv("DATABASE_URL", current);
     console.log(`Postgres already reachable at ${redact(current)}`);
     process.env.DATABASE_URL = current;
   } else if (await tryDocker()) {

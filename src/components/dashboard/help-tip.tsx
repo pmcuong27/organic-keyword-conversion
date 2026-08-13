@@ -18,13 +18,15 @@ export function HelpTip({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
+        <span
+          tabIndex={0}
           className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={label}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
         >
           <CircleHelp className="size-3.5" />
-        </button>
+        </span>
       </TooltipTrigger>
       <TooltipContent
         side="bottom"

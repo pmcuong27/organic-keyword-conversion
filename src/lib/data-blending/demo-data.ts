@@ -117,39 +117,37 @@ export function getDemoSourceRows(days = 30): { gsc: GscRow[]; ga4: Ga4Row[] } {
           });
         }
 
-        // Non-key event names so Conversion Events can toggle All vs Key events
-        if (hour === "12") {
-          ga4.push({
-            date,
-            hour,
-            landingPage: page,
-            conversionPage: page,
-            eventName: "page_view",
-            device: "DESKTOP",
-            country: "US",
-            sessions: 8 + (i % 4),
-            eventCount: 12 + (i % 5),
-            conversions: 0,
-            eventValue: 0,
-            channelGroup: "Organic Search",
-            isKeyEvent: false,
-          });
-          ga4.push({
-            date,
-            hour,
-            landingPage: page,
-            conversionPage: page,
-            eventName: "session_start",
-            device: "MOBILE",
-            country: "US",
-            sessions: 5 + (i % 3),
-            eventCount: 5 + (i % 3),
-            conversions: 0,
-            eventValue: 0,
-            channelGroup: "Organic Search",
-            isKeyEvent: false,
-          });
-        }
+        // Organic Search user traffic for this landing × hour (not only converting events)
+        ga4.push({
+          date,
+          hour,
+          landingPage: page,
+          conversionPage: page,
+          eventName: "page_view",
+          device: "DESKTOP",
+          country: "US",
+          sessions: 8 + (i % 4),
+          eventCount: 12 + (i % 5),
+          conversions: 0,
+          eventValue: 0,
+          channelGroup: "Organic Search",
+          isKeyEvent: false,
+        });
+        ga4.push({
+          date,
+          hour,
+          landingPage: page,
+          conversionPage: page,
+          eventName: "session_start",
+          device: "MOBILE",
+          country: "US",
+          sessions: 5 + (i % 3) + (page === "/features" && hour === "14" ? 4 : 0),
+          eventCount: 5 + (i % 3),
+          conversions: 0,
+          eventValue: 0,
+          channelGroup: "Organic Search",
+          isKeyEvent: false,
+        });
       }
     }
   }

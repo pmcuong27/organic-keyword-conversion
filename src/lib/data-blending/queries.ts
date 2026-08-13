@@ -201,10 +201,10 @@ export async function getQueryMappingAnalysis(params: {
 
   let buckets = buildQueryMappingAnalysis(gsc, ga4);
 
-  if (params.withKeyEventsOnly !== false) {
+  if (params.withKeyEventsOnly) {
     buckets = buckets.filter((b) => b.keyEvents > 0);
   }
-  if (params.crowdedOnly !== false) {
+  if (params.crowdedOnly) {
     buckets = buckets.filter((b) => b.keywordCount >= 2);
   }
 

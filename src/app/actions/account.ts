@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { ensureAppUser } from "@/lib/app-user";
 import { isDatabaseConnectionError, prisma } from "@/lib/prisma";
 import { getGoogleAccessToken } from "@/lib/google-token";
 import { getGa4PropertyTimezone } from "@/lib/data-blending/ga4";
@@ -18,32 +19,15 @@ async function requireUserId() {
   return session.user.id;
 }
 
-/** JWT sessions do not create Prisma users; pairings still need a User row. */
+/** Resolve the canonical User row (by id or email) for this session. */
 async function ensureUserRow(userId: string) {
   const session = await auth();
-  try {
-    await prisma.user.upsert({
-      where: { id: userId },
-      create: {
-        id: userId,
-        name: session?.user?.name ?? null,
-        email: session?.user?.email ?? null,
-        image: session?.user?.image ?? null,
-      },
-      update: {
-        name: session?.user?.name ?? null,
-        email: session?.user?.email ?? null,
-        image: session?.user?.image ?? null,
-      },
-    });
-  } catch (err) {
-    if (isDatabaseConnectionError(err)) {
-      throw new Error(
-        "Postgres is not running. In the web folder run: npm run db:up",
-      );
-    }
-    throw err;
-  }
+  return ensureAppUser({
+    id: userId,
+    name: session?.user?.name,
+    email: session?.user?.email,
+    image: session?.user?.image,
+  });
 }
 
 export async function signInWithGoogle() {
@@ -51,7 +35,7 @@ export async function signInWithGoogle() {
 }
 
 export async function savePropertyMapping(formData: FormData) {
-  const userId = await requireUserId();
+  const sessionUserId = await requireUserId();
   const gscSiteUrl = String(formData.get("gscSiteUrl") || "").trim();
   const ga4PropertyId = String(formData.get("ga4PropertyId") || "").trim();
   const ga4DisplayName = String(formData.get("ga4DisplayName") || "").trim();
@@ -61,9 +45,9 @@ export async function savePropertyMapping(formData: FormData) {
     throw new Error("Choose both a Search Console site and a GA4 property.");
   }
 
-  const accessToken = await getGoogleAccessToken(userId);
+  const accessToken = await getGoogleAccessToken(sessionUserId);
   const timezone = await getGa4PropertyTimezone(accessToken, ga4PropertyId);
-  await ensureUserRow(userId);
+  const userId = await ensureUserRow(sessionUserId);
 
   try {
     const existingCount = await prisma.propertyMapping.count({ where: { userId } });

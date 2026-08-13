@@ -8,4 +8,5 @@ export * from "./journey";
 export * from "./offline-db";
 export * from "./sync";
 export * from "./rollups";
+export * from "./scheduled-sync";
 export * from "./queries";

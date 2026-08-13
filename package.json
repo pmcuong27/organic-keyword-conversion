@@ -11,6 +11,7 @@
     "db:down": "node scripts/ensure-postgres.mjs --down",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "cron:sync": "node -e \"const s=process.env.CRON_SECRET; if(!s){console.error('Set CRON_SECRET'); process.exit(1)} fetch('http://localhost:3000/api/cron/sync',{headers:{Authorization:'Bearer '+s}}).then(async r=>{console.log(await r.text()); process.exit(r.ok?0:1)})\"",
     "postinstall": "prisma generate"
   },
   "dependencies": {

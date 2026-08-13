@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest) {
   const isPublic =
     isAuthPage ||
     path.startsWith("/api/auth") ||
+    path.startsWith("/api/cron") ||
     path === "/" ||
     path.startsWith("/setup");
 

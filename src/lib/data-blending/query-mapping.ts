@@ -120,6 +120,29 @@ function bucketKey(date: string, hour: string | null, landingPage: string) {
   return `${date}::${hour ?? "all"}::${landingPage}`;
 }
 
+function isOrganicSearch(channel?: string | null) {
+  if (!channel) return true;
+  return channel.trim().toLowerCase() === "organic search";
+}
+
+const TRAFFIC_EVENTS = new Set(["session_start", "page_view", "first_visit"]);
+
+/** Organic visitor count for a landing×hour. Do not sum sessions across event names. */
+function organicUserTraffic(
+  rows: Array<{ eventName: string; sessions: number }>,
+): number {
+  let preferred = 0;
+  let maxSessions = 0;
+  for (const row of rows) {
+    const sessions = row.sessions || 0;
+    if (sessions > maxSessions) maxSessions = sessions;
+    if (TRAFFIC_EVENTS.has((row.eventName || "").toLowerCase()) && sessions > preferred) {
+      preferred = sessions;
+    }
+  }
+  return preferred > 0 ? preferred : maxSessions;
+}
+
 function distributionOverlap(
   weight: number,
   key: string | null,
@@ -183,8 +206,11 @@ export function scoreConfidence(params: {
 }
 
 /**
- * Build query→key-event mapping buckets for page×hour windows where
- * multiple keywords compete for the same conversion pool.
+ * Build query→key-event mapping buckets for landing-page × hour windows.
+ * A bucket is emitted only when Search Console recorded at least one click and
+ * GA4 recorded Organic Search user traffic on that same landing page in the
+ * same hour. Keywords without clicks are excluded. This is not a visitor-level
+ * join — GSC and GA4 share no session or cookie id.
  */
 export function buildQueryMappingAnalysis(
   gscRows: GscMappingRow[],
@@ -211,6 +237,7 @@ export function buildQueryMappingAnalysis(
   >();
 
   for (const row of gscRows) {
+    if (!(row.clicks > 0)) continue;
     const landingPage = normalizeLandingPage(row.page);
     const date = formatDateKey(toDateOnly(row.date));
     const hour = normalizeHour(row.hour);
@@ -257,17 +284,19 @@ export function buildQueryMappingAnalysis(
     >;
     devices: Record<string, number>;
     countries: Record<string, number>;
+    trafficRows: Array<{ eventName: string; sessions: number }>;
   };
   const ga4ByBucket = new Map<string, Ga4Bucket>();
 
   for (const row of ga4Rows) {
-    if (!(row.isKeyEvent ?? (row.conversions || 0) > 0)) continue;
+    if (!isOrganicSearch(row.channelGroup)) continue;
+    if (!(row.sessions > 0 || (row.conversions || 0) > 0 || (row.eventCount ?? 0) > 0)) continue;
 
     const landingPage = normalizeLandingPage(row.landingPage);
     const conversionPage = normalizeLandingPage(row.conversionPage || row.landingPage);
     const date = formatDateKey(toDateOnly(row.date));
     const hour = normalizeHour(row.hour);
-    // CRITICAL: join on session landing page, never on conversion/thank-you page
+    // Join on session landing page × hour, never on conversion/thank-you page
     const key = bucketKey(date, hour, landingPage);
     const agg = ga4ByBucket.get(key) ?? {
       conversions: 0,
@@ -277,38 +306,46 @@ export function buildQueryMappingAnalysis(
       journeys: new Map(),
       devices: {} as Record<string, number>,
       countries: {} as Record<string, number>,
+      trafficRows: [],
     };
-    agg.conversions += row.conversions || 0;
-    agg.eventValue += row.eventValue || 0;
-    agg.sessions += row.sessions || 0;
-    const ev = agg.events.get(row.eventName) ?? {
-      conversions: 0,
-      eventValue: 0,
-      conversionPage,
-    };
-    ev.conversions += row.conversions || 0;
-    ev.eventValue += row.eventValue || 0;
-    // Prefer a multi-page conversion page when present
-    if (conversionPage !== landingPage) ev.conversionPage = conversionPage;
-    agg.events.set(row.eventName, ev);
-
-    const journeyKey = `${conversionPage}::${row.eventName}`;
-    const journey = agg.journeys.get(journeyKey) ?? {
-      conversionPage,
-      eventName: row.eventName,
-      conversions: 0,
-      eventValue: 0,
-    };
-    journey.conversions += row.conversions || 0;
-    journey.eventValue += row.eventValue || 0;
-    agg.journeys.set(journeyKey, journey);
+    agg.trafficRows.push({ eventName: row.eventName, sessions: row.sessions || 0 });
 
     const device = normalizeDevice(row.device);
     if (device) agg.devices[device] = (agg.devices[device] ?? 0) + (row.sessions || 0);
     const country = normalizeCountry(row.country);
     if (country) agg.countries[country] = (agg.countries[country] ?? 0) + (row.sessions || 0);
 
+    const isKey = row.isKeyEvent ?? (row.conversions || 0) > 0;
+    if (isKey) {
+      agg.conversions += row.conversions || 0;
+      agg.eventValue += row.eventValue || 0;
+      const ev = agg.events.get(row.eventName) ?? {
+        conversions: 0,
+        eventValue: 0,
+        conversionPage,
+      };
+      ev.conversions += row.conversions || 0;
+      ev.eventValue += row.eventValue || 0;
+      if (conversionPage !== landingPage) ev.conversionPage = conversionPage;
+      agg.events.set(row.eventName, ev);
+
+      const journeyKey = `${conversionPage}::${row.eventName}`;
+      const journey = agg.journeys.get(journeyKey) ?? {
+        conversionPage,
+        eventName: row.eventName,
+        conversions: 0,
+        eventValue: 0,
+      };
+      journey.conversions += row.conversions || 0;
+      journey.eventValue += row.eventValue || 0;
+      agg.journeys.set(journeyKey, journey);
+    }
+
     ga4ByBucket.set(key, agg);
+  }
+
+  for (const agg of ga4ByBucket.values()) {
+    agg.sessions = organicUserTraffic(agg.trafficRows);
   }
 
   const buckets: QueryMappingBucket[] = [];
@@ -324,6 +361,7 @@ export function buildQueryMappingAnalysis(
     const keyEvents = ga4?.conversions ?? 0;
     const eventValue = ga4?.eventValue ?? 0;
     const sessions = ga4?.sessions ?? 0;
+    if (totalClicks <= 0 || sessions <= 0) continue;
 
     const keywords: MappedKeyword[] = [...gsc.keywords.entries()].map(([keyword, stats]) => {
       const clickShare = totalClicks > 0 ? stats.clicks / totalClicks : 0;
