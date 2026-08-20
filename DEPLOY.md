@@ -112,7 +112,7 @@ git push origin main
 npx vercel --prod
 ```
 
-`npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`. Pending migrations apply on every production build when `DATABASE_URL` is present.
+`npm run build` runs `prisma generate`, then `prisma migrate deploy` **only when `DATABASE_URL` is set**, then `next build`. On Prisma Compute, link the Postgres database (or set `DATABASE_URL` in app env) before expecting migrations in the build; otherwise run `npm run db:migrate` once against production after the first green deploy.
 
 Daily sync: `vercel.json` calls `GET /api/cron/sync` at 06:00 UTC with `Authorization: Bearer $CRON_SECRET`.
 
