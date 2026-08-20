@@ -24,7 +24,10 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  // Required for Prisma Compute (and other container hosts) Next.js deploys.
+  output: "standalone",
   poweredByHeader: false,
+  serverExternalPackages: ["better-sqlite3"],
   turbopack: {
     root: path.join(__dirname),
   },

@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import path from "path";
+import type { Database as SqliteDatabase } from "better-sqlite3";
 import type { Ga4Row, GscRow } from "./attribution";
 import type { Ga4MappingRow, GscMappingRow } from "./query-mapping";
 import { normalizeLandingPage } from "./normalize";
@@ -12,7 +12,20 @@ export function resolveOfflineDbPath() {
   );
 }
 
-function openDb() {
+function openDb(): SqliteDatabase {
+  let Database: new (
+    filename: string,
+    options?: { readonly?: boolean; fileMustExist?: boolean },
+  ) => SqliteDatabase;
+  try {
+    // Optional native module — skip on Prisma Compute / Vercel (USE_OFFLINE_DB=false).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Database = require("better-sqlite3");
+  } catch {
+    throw new Error(
+      "USE_OFFLINE_DB needs better-sqlite3. Locally run: npm i better-sqlite3. Cloud deploys should keep USE_OFFLINE_DB=false.",
+    );
+  }
   const dbPath = resolveOfflineDbPath();
   return new Database(dbPath, { readonly: true, fileMustExist: true });
 }

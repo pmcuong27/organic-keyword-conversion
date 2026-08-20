@@ -95,6 +95,17 @@ Security headers (HSTS, frame deny, nosniff, referrer policy) are set in `next.c
 
 ## 6. Deploy
 
+### Option A — Prisma Compute (GitHub connected)
+
+This repo includes `prisma.compute.json` (Next.js standalone on port 3000).
+
+1. Fix/push must be on `master` before merging Prisma’s setup PR (or close that PR if `prisma.compute.json` is already on `master`).
+2. Keep `USE_OFFLINE_DB=false`. Do not rely on `better-sqlite3` in cloud builds (it is optional and native).
+3. Set the same Production env vars in the Prisma Console as in the table above.
+4. Redeploy from Console or push to `master`.
+
+### Option B — Vercel
+
 ```bash
 git push origin main
 # or
