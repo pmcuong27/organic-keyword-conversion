@@ -7,9 +7,11 @@ import {
 import { getDemoSourceRows } from "./demo-data";
 import {
   buildQueryMappingAnalysis,
+  collectOtherEngineKeyEvents,
   summarizeMapping,
   type Ga4MappingRow,
   type GscMappingRow,
+  type OtherEngineKeyEvent,
   type QueryMappingBucket,
 } from "./query-mapping";
 import {
@@ -89,33 +91,53 @@ function mapCachedAttribution(r: {
   hour?: string | null;
   keyword: string;
   landingPage: string;
+  device?: string | null;
+  country?: string | null;
   clicks: number;
   impressions: number;
   ctr: number;
   position: number;
   pageTotalClicks: number;
   clickShare: number;
+  propensityShare?: number | null;
   organicConversions: number;
   estimatedConversions: number;
   estimatedConvRate: number;
   estimatedValue: number;
+  confidenceScore?: number | null;
+  confidenceLevel?: string | null;
   eventBreakdown: unknown;
 }): KeywordAttributionRow {
+  const propensityShare = r.propensityShare ?? r.clickShare;
+  const score = r.confidenceScore ?? 0;
+  const level = (r.confidenceLevel as KeywordAttributionRow["confidence"]["level"]) ?? "low";
   return {
     date: r.date.toISOString().slice(0, 10),
     hour: hourFromStorage(r.hour),
     keyword: r.keyword,
     landingPage: r.landingPage,
+    device: r.device || null,
+    country: r.country || null,
     clicks: r.clicks,
     impressions: r.impressions,
     ctr: r.ctr,
     position: r.position,
     pageTotalClicks: r.pageTotalClicks,
     clickShare: r.clickShare,
+    propensityShare,
     organicConversions: r.organicConversions,
     estimatedConversions: r.estimatedConversions,
     estimatedConvRate: r.estimatedConvRate,
     estimatedValue: r.estimatedValue,
+    confidence: {
+      propensityShare,
+      uniqueness: 0,
+      sampleStrength: 0,
+      poolStrength: 0,
+      segmentMatch: r.device || r.country ? 1 : 0.25,
+      score,
+      level,
+    },
     eventBreakdown: (r.eventBreakdown as KeywordAttributionRow["eventBreakdown"]) ?? [],
   };
 }
@@ -179,7 +201,11 @@ export async function getQueryMappingAnalysis(params: {
   to: Date;
   crowdedOnly?: boolean;
   withKeyEventsOnly?: boolean;
-}): Promise<{ buckets: QueryMappingBucket[]; summary: ReturnType<typeof summarizeMapping> }> {
+}): Promise<{
+  buckets: QueryMappingBucket[];
+  otherEngineEvents: OtherEngineKeyEvent[];
+  summary: ReturnType<typeof summarizeMapping>;
+}> {
   const fromKey = toDateKey(params.from);
   const toKey = toDateKey(params.to);
 
@@ -208,7 +234,12 @@ export async function getQueryMappingAnalysis(params: {
     buckets = buckets.filter((b) => b.keywordCount >= 2);
   }
 
-  return { buckets, summary: summarizeMapping(buckets) };
+  const otherEngineEvents = collectOtherEngineKeyEvents(ga4);
+  return {
+    buckets,
+    otherEngineEvents,
+    summary: summarizeMapping(buckets, otherEngineEvents),
+  };
 }
 
 export async function getLastSyncAt(propertyId?: string | null) {

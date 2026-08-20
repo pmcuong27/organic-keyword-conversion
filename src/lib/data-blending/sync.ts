@@ -13,6 +13,10 @@ function chunk<T>(items: T[], size: number) {
   return out;
 }
 
+function segmentStorage(value?: string | null) {
+  return value && value.length ? value : "";
+}
+
 export async function syncLiveProperty(params: {
   userId: string;
   propertyId: string;
@@ -41,6 +45,7 @@ export async function syncLiveProperty(params: {
       startDate,
       endDate,
       hourly,
+      propertyTimezone: mapping.timezone,
     }),
     fetchGa4OrganicConversions({
       accessToken,
@@ -53,7 +58,8 @@ export async function syncLiveProperty(params: {
 
   const blended = blendKeywordAttributions(gsc, ga4);
 
-  await prisma.$transaction(async (tx) => {
+  try {
+    await prisma.$transaction(async (tx) => {
     await tx.gscDailyMetric.deleteMany({
       where: { propertyId: mapping.id, date: { gte: params.from, lte: params.to } },
     });
@@ -72,6 +78,8 @@ export async function syncLiveProperty(params: {
         query: r.query,
         page: r.page,
         landingPage: normalizeLandingPage(r.page),
+        device: segmentStorage(r.device),
+        country: segmentStorage(r.country),
         clicks: r.clicks,
         impressions: r.impressions,
         ctr: r.ctr,
@@ -92,8 +100,11 @@ export async function syncLiveProperty(params: {
           date: new Date(`${r.date}T00:00:00.000Z`),
           hour: hourToStorage(r.hour),
           landingPage: normalizeLandingPage(r.landingPage),
+          device: segmentStorage(r.device),
+          country: segmentStorage(r.country),
           eventName: r.eventName,
           channelGroup: r.channelGroup || "Organic Search",
+          source: (r.source || "").trim(),
           sessions: r.sessions,
           eventCount,
           conversions: keyEvents,
@@ -113,16 +124,21 @@ export async function syncLiveProperty(params: {
         hour: hourToStorage(r.hour),
         keyword: r.keyword,
         landingPage: r.landingPage,
+        device: segmentStorage(r.device),
+        country: segmentStorage(r.country),
         clicks: r.clicks,
         impressions: r.impressions,
         ctr: r.ctr,
         position: r.position,
         pageTotalClicks: r.pageTotalClicks,
         clickShare: r.clickShare,
+        propensityShare: r.propensityShare,
         organicConversions: r.organicConversions,
         estimatedConversions: r.estimatedConversions,
         estimatedConvRate: r.estimatedConvRate,
         estimatedValue: r.estimatedValue,
+        confidenceScore: r.confidence.score,
+        confidenceLevel: r.confidence.level,
         eventBreakdown: r.eventBreakdown,
       })),
       1000,
@@ -134,7 +150,20 @@ export async function syncLiveProperty(params: {
       where: { id: mapping.id },
       data: { lastSyncedAt: new Date() },
     });
-  }, { timeout: 120_000, maxWait: 15_000 });
+    }, { timeout: 120_000, maxWait: 15_000 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      /Unknown argument `(device|country|source|propensityShare|confidenceScore|confidenceLevel)`/i.test(
+        message,
+      )
+    ) {
+      throw new Error(
+        "Prisma client is out of date for segmented sync. Stop the Next.js server, then run `npx prisma generate` and `npm run db:ensure`, and start `npm run dev` again.",
+      );
+    }
+    throw err;
+  }
 
   return {
     gscRows: gsc.length,
@@ -165,8 +194,8 @@ export async function readCachedMappingSources(
         hour: r.hour || null,
         query: r.query,
         page: r.landingPage || r.page,
-        device: null,
-        country: null,
+        device: r.device || null,
+        country: r.country || null,
         clicks: r.clicks,
         impressions: r.impressions,
         ctr: r.ctr,
@@ -178,13 +207,14 @@ export async function readCachedMappingSources(
         landingPage: r.landingPage,
         conversionPage: r.landingPage,
         eventName: r.eventName,
-        device: null,
-        country: null,
+        device: r.device || null,
+        country: r.country || null,
         sessions: r.sessions,
         eventCount: r.eventCount,
         conversions: r.conversions,
         eventValue: r.eventValue,
         channelGroup: r.channelGroup,
+        source: r.source || null,
         isKeyEvent: r.isKeyEvent,
       })),
     };

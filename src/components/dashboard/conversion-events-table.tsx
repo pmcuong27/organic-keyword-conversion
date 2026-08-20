@@ -31,6 +31,8 @@ export type EventFilterMode = "all" | "key";
 function exportCsv(rows: ConversionEventRollup[], mode: EventFilterMode) {
   const headers = [
     "eventName",
+    "source",
+    "engines",
     "isKeyEvent",
     "eventCount",
     "keyEvents",
@@ -44,6 +46,8 @@ function exportCsv(rows: ConversionEventRollup[], mode: EventFilterMode) {
     ...rows.map((r) =>
       [
         JSON.stringify(r.eventName),
+        JSON.stringify(r.sourceLabel),
+        JSON.stringify(r.sources.join(", ")),
         r.isKeyEvent,
         r.eventCount,
         r.conversions,
@@ -103,6 +107,26 @@ export function ConversionEventsTable({
             ) : null}
           </div>
         ),
+      },
+      {
+        accessorKey: "sourceLabel",
+        header: "Source",
+        cell: ({ row }) => (
+          <div className="flex flex-col gap-0.5">
+            <Badge
+              variant={row.original.sourceGroup === "google" ? "secondary" : "outline"}
+              className="w-fit text-[10px] font-normal"
+            >
+              {row.original.sourceLabel}
+            </Badge>
+            {row.original.sourceGroup === "other-engine" && row.original.sources.length ? (
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {row.original.sources.join(", ")}
+              </span>
+            ) : null}
+          </div>
+        ),
+        size: 140,
       },
       {
         accessorKey: "eventCount",

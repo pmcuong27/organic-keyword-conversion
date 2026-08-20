@@ -113,6 +113,7 @@ export function getDemoSourceRows(days = 30): { gsc: GscRow[]; ga4: Ga4Row[] } {
             conversions,
             eventValue: conversions * (eventName === "generate_lead" ? 120 : 40),
             channelGroup: "Organic Search",
+            source: "google",
             isKeyEvent: true,
           });
         }
@@ -131,6 +132,7 @@ export function getDemoSourceRows(days = 30): { gsc: GscRow[]; ga4: Ga4Row[] } {
           conversions: 0,
           eventValue: 0,
           channelGroup: "Organic Search",
+          source: "google",
           isKeyEvent: false,
         });
         ga4.push({
@@ -146,10 +148,44 @@ export function getDemoSourceRows(days = 30): { gsc: GscRow[]; ga4: Ga4Row[] } {
           conversions: 0,
           eventValue: 0,
           channelGroup: "Organic Search",
+          source: "google",
           isKeyEvent: false,
         });
       }
     }
+
+    ga4.push({
+      date,
+      hour: "13",
+      landingPage: "/contact",
+      conversionPage: "/contact",
+      eventName: "contact",
+      device: "MOBILE",
+      country: "US",
+      sessions: 1,
+      eventCount: 1,
+      conversions: 1,
+      eventValue: 40,
+      channelGroup: "Organic Search",
+      source: "bing",
+      isKeyEvent: true,
+    });
+    ga4.push({
+      date,
+      hour: "09",
+      landingPage: "/",
+      conversionPage: "/",
+      eventName: "generate_lead",
+      device: "DESKTOP",
+      country: "US",
+      sessions: 1,
+      eventCount: 1,
+      conversions: 1,
+      eventValue: 120,
+      channelGroup: "Organic Search",
+      source: "coccoc",
+      isKeyEvent: true,
+    });
   }
 
   return { gsc, ga4 };

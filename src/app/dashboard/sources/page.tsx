@@ -28,10 +28,34 @@ export default async function SourcesPage() {
       {mapping && info.mode === "live" ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            Pull yesterday and today from Search Console and GA4 for this pairing.
+            Pull yesterday and today from Search Console and GA4 for the selected pairing.
           </p>
           <SyncLast24HoursButton size="sm" />
         </div>
+      ) : null}
+
+      {ctx.mode === "live" && ctx.properties.length > 1 ? (
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">All saved pairings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {ctx.properties.map((pairing) => (
+              <div key={pairing.id} className="flex flex-wrap justify-between gap-2">
+                <span className={pairing.id === ctx.property?.id ? "font-medium" : ""}>
+                  {pairing.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {pairing.id === ctx.property?.id ? "selected · " : ""}
+                  {pairing.gscSiteUrl.replace(/^https?:\/\//, "")}
+                </span>
+              </div>
+            ))}
+            <p className="pt-1 text-xs text-muted-foreground">
+              Switch clients from the header, or add more on Client pairings.
+            </p>
+          </CardContent>
+        </Card>
       ) : null}
 
       {mapping ? (

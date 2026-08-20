@@ -33,7 +33,7 @@ async function EventsContent({
     <div className="flex h-full min-h-[calc(100svh-3.5rem)] flex-col gap-3 p-4 md:p-6">
       <PageHeading
         title="Conversion Events"
-        help="Organic Search events from GA4 for the selected date range. Use All event names to see every event, or Key event = true to show only events marked as key events in GA4. Keyword attribution still uses key events only."
+        help="Organic Search events from GA4 for the selected date range. Keyword mapping only uses Organic Search from Google (session source google). Key events from Bing, Cốc Cốc, and other engines stay visible here as Other Engine and are not joined to Search Console keywords."
       />
       <ConversionEventsTable data={rows} mode={mode} />
     </div>

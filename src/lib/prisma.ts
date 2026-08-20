@@ -43,6 +43,14 @@ export function withPoolParams(url: string) {
   try {
     const parsed = new URL(preferIpv4Host(url));
     parsed.searchParams.set("pgbouncer", "true");
+    const limit = Number(parsed.searchParams.get("connection_limit") || "10");
+    if (!Number.isFinite(limit) || limit > 5) {
+      parsed.searchParams.set("connection_limit", "5");
+    }
+    const connectTimeout = parsed.searchParams.get("connect_timeout");
+    if (!connectTimeout || connectTimeout === "0") {
+      parsed.searchParams.set("connect_timeout", "10");
+    }
     return parsed.toString();
   } catch {
     const ipv4 = preferIpv4Host(url);
@@ -63,7 +71,7 @@ export function isDatabaseConnectionError(err: unknown) {
       ? String((err as { code?: string }).code)
       : "";
   return (
-    /can't reach database|ECONNREFUSED|P1001|P1017|P1000|connection refused|timeout expired/i.test(
+    /can't reach database|ECONNREFUSED|ECONNRESET|P1001|P1017|P1000|connection refused|timeout expired/i.test(
       message,
     ) || ["P1001", "P1017", "P1000"].includes(code)
   );
@@ -83,13 +91,20 @@ function createClient(url: string) {
   return client.$extends({
     query: {
       async $allOperations({ args, query }) {
-        try {
-          return await query(args);
-        } catch (err) {
-          if (!isPreparedStatementCollision(err)) throw err;
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          return query(args);
+        let lastErr: unknown;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            return await query(args);
+          } catch (err) {
+            lastErr = err;
+            const retry =
+              isPreparedStatementCollision(err) ||
+              (isDatabaseConnectionError(err) && attempt < 2);
+            if (!retry) throw err;
+            await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+          }
         }
+        throw lastErr;
       },
     },
   }) as unknown as PrismaClient;

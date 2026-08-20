@@ -9,6 +9,7 @@ import {
   FileText,
   Zap,
   Database,
+  Briefcase,
   Settings,
   PanelLeftClose,
   PanelLeft,
@@ -25,6 +26,7 @@ const nav = [
   { href: "/dashboard/pages", label: "Pages & Landing URLs", icon: FileText },
   { href: "/dashboard/events", label: "Conversion Events", icon: Zap },
   { href: "/dashboard/sources", label: "Data Sources", icon: Database },
+  { href: "/dashboard/pairings", label: "Client pairings", icon: Briefcase },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

@@ -11,6 +11,7 @@ export type PropertyOption = {
   ga4DisplayName: string | null;
   gscSiteUrl: string;
   timezone: string;
+  isDefault: boolean;
   lastSyncedAt: Date | null;
 };
 
@@ -22,8 +23,13 @@ export function toPropertyOption(row: PropertyMapping): PropertyOption {
     ga4DisplayName: row.ga4DisplayName,
     gscSiteUrl: row.gscSiteUrl,
     timezone: row.timezone,
+    isDefault: row.isDefault,
     lastSyncedAt: row.lastSyncedAt,
   };
+}
+
+export function pairingKey(gscSiteUrl: string, ga4PropertyId: string) {
+  return `${gscSiteUrl}::${ga4PropertyId}`;
 }
 
 export async function listUserProperties(userId: string): Promise<PropertyOption[]> {

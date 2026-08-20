@@ -167,6 +167,8 @@ async function main() {
   if (!args.has("--no-push")) {
     const push = run("npx", ["prisma", "db", "push"], true);
     if (push.status !== 0) process.exit(push.status ?? 1);
+    const ensure = run("node", ["scripts/ensure-hour-schema.mjs"], true);
+    if (ensure.status !== 0) process.exit(ensure.status ?? 1);
   }
 }
 

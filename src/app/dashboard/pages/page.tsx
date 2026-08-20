@@ -19,7 +19,7 @@ async function PagesContent({ range }: { range: string }) {
     <div className="flex h-full min-h-[calc(100svh-3.5rem)] flex-col gap-3 p-4 md:p-6">
       <PageHeading
         title="Pages & Landing URLs"
-        help="Each row is a normalized landing page. Search Console clicks and impressions are rolled up by page; GA4 organic key events and estimated conversions come from the same date range in the header."
+        help="Each row is a normalized landing page. Search Console clicks and impressions are rolled up by page; GA4 Google Organic Search key events and estimated conversions come from the same date range in the header. Other-engine organic events are excluded."
       />
       <LandingPagesTable data={rows} />
     </div>

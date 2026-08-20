@@ -13,6 +13,21 @@ import { syncLiveProperty } from "@/lib/data-blending/sync";
 import { rangeToDates } from "@/lib/range";
 import { isLiveGoogleMode } from "@/lib/app-mode";
 
+function propertyCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  };
+}
+
+function safeNextPath(raw: FormDataEntryValue | null) {
+  const value = String(raw || "").trim();
+  if (value.startsWith("/dashboard") || value === "/onboarding") return value;
+  return "/dashboard";
+}
+
 async function requireUserId() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("You must be signed in.");
@@ -73,12 +88,7 @@ export async function savePropertyMapping(formData: FormData) {
     });
 
     const cookieStore = await cookies();
-    cookieStore.set(PROPERTY_COOKIE, mapping.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    cookieStore.set(PROPERTY_COOKIE, mapping.id, propertyCookieOptions());
   } catch (err) {
     if (isDatabaseConnectionError(err)) {
       throw new Error("Postgres is not running. In the web folder run: npm run db:up");
@@ -87,7 +97,7 @@ export async function savePropertyMapping(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(safeNextPath(formData.get("next")));
 }
 
 export async function selectPropertyAction(propertyId: string) {
@@ -98,18 +108,52 @@ export async function selectPropertyAction(propertyId: string) {
   if (!mapping) throw new Error("Property not found.");
 
   const cookieStore = await cookies();
-  cookieStore.set(PROPERTY_COOKIE, mapping.id, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
+  cookieStore.set(PROPERTY_COOKIE, mapping.id, propertyCookieOptions());
+  revalidatePath("/", "layout");
+}
+
+export async function setDefaultPropertyAction(propertyId: string) {
+  const userId = await requireUserId();
+  const mapping = await prisma.propertyMapping.findFirst({
+    where: { id: propertyId, userId },
   });
+  if (!mapping) throw new Error("Property not found.");
+
+  await prisma.$transaction([
+    prisma.propertyMapping.updateMany({
+      where: { userId, isDefault: true },
+      data: { isDefault: false },
+    }),
+    prisma.propertyMapping.update({
+      where: { id: mapping.id },
+      data: { isDefault: true },
+    }),
+  ]);
+
+  const cookieStore = await cookies();
+  cookieStore.set(PROPERTY_COOKIE, mapping.id, propertyCookieOptions());
   revalidatePath("/", "layout");
 }
 
 export async function deletePropertyAction(propertyId: string) {
   const userId = await requireUserId();
+  const cookieStore = await cookies();
+  const selectedId = cookieStore.get(PROPERTY_COOKIE)?.value;
+
   await prisma.propertyMapping.deleteMany({ where: { id: propertyId, userId } });
+
+  if (selectedId === propertyId) {
+    const next = await prisma.propertyMapping.findFirst({
+      where: { userId },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+    if (next) {
+      cookieStore.set(PROPERTY_COOKIE, next.id, propertyCookieOptions());
+    } else {
+      cookieStore.delete(PROPERTY_COOKIE);
+    }
+  }
+
   revalidatePath("/", "layout");
 }
 

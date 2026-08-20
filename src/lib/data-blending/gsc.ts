@@ -1,10 +1,14 @@
 import { formatDateKey } from "./normalize";
 import type { GscRow } from "./attribution";
+import { convertGscHourToTimezone, normalizeCountry, normalizeDevice } from "./bucket";
 
 type Token = { access_token: string };
 
 /** Parse GSC HOUR dimension keys (e.g. 2025-04-07T14:00:00-07:00). */
-export function parseGscHourDimension(raw: string | undefined): {
+export function parseGscHourDimension(
+  raw: string | undefined,
+  propertyTimezone = "UTC",
+): {
   date: string;
   hour: string | null;
 } {
@@ -12,13 +16,11 @@ export function parseGscHourDimension(raw: string | undefined): {
     return { date: formatDateKey(new Date()), hour: null };
   }
 
-  // ISO datetime from HOUR dimension (Pacific offset)
   const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
   if (isoMatch) {
-    return { date: isoMatch[1], hour: isoMatch[2] };
+    return convertGscHourToTimezone(raw, propertyTimezone);
   }
 
-  // Plain date
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     return { date: raw, hour: null };
   }
@@ -31,10 +33,7 @@ export function parseGscHourDimension(raw: string | undefined): {
     };
   }
 
-  return {
-    date: formatDateKey(new Date()),
-    hour: raw.slice(0, 2).padStart(2, "0"),
-  };
+  return convertGscHourToTimezone(raw, propertyTimezone);
 }
 
 /** @deprecated use parseGscHourDimension */
@@ -119,41 +118,67 @@ async function queryGsc(params: {
   return rows;
 }
 
+function mapGscRow(
+  keys: string[],
+  metrics: { clicks: number; impressions: number; ctr: number; position: number },
+  dims: string[],
+  propertyTimezone: string,
+): GscRow {
+  const byDim = Object.fromEntries(dims.map((d, i) => [d, keys[i] ?? ""]));
+  const hourRaw = byDim.hour;
+  const dateRaw = byDim.date;
+  const parsed = hourRaw
+    ? parseGscHourDimension(hourRaw, propertyTimezone)
+    : {
+        date: dateRaw ? formatDateKey(new Date(`${dateRaw}T00:00:00Z`)) : formatDateKey(new Date()),
+        hour: null as string | null,
+      };
+
+  return {
+    date: parsed.date,
+    hour: parsed.hour,
+    query: byDim.query ?? "",
+    page: byDim.page ?? "/",
+    device: normalizeDevice(byDim.device),
+    country: normalizeCountry(byDim.country),
+    clicks: metrics.clicks ?? 0,
+    impressions: metrics.impressions ?? 0,
+    ctr: metrics.ctr ?? 0,
+    position: metrics.position ?? 0,
+  };
+}
+
 export async function fetchGscSearchAnalytics(params: {
   accessToken: string;
   siteUrl: string;
   startDate: string;
   endDate: string;
   hourly?: boolean;
+  propertyTimezone?: string;
 }): Promise<GscRow[]> {
   const hourly = params.hourly ?? false;
+  const propertyTimezone = params.propertyTimezone || "UTC";
+  const segmentDims = ["device", "country"] as const;
 
   if (hourly) {
     try {
-      // HOUR already embeds the timestamp — do not also group by date (invalid argument).
       const batch = await queryGsc({
         accessToken: params.accessToken,
         siteUrl: params.siteUrl,
         startDate: params.startDate,
         endDate: params.endDate,
-        dimensions: ["hour", "query", "page"],
+        dimensions: ["hour", "query", "page", ...segmentDims],
         dataState: "hourly_all",
       });
 
-      return batch.map((r) => {
-        const [hourRaw, query, page] = r.keys;
-        const parsed = parseGscHourDimension(hourRaw);
-        return {
-          date: parsed.date,
-          hour: parsed.hour,
-          query: query ?? "",
-          page: page ?? "/",
-          clicks: r.clicks ?? 0,
-          impressions: r.impressions ?? 0,
-          ctr: r.ctr ?? 0,
-          position: r.position ?? 0,
-        };
-      });
+      return batch.map((r) =>
+        mapGscRow(
+          r.keys,
+          r,
+          ["hour", "query", "page", ...segmentDims],
+          propertyTimezone,
+        ),
+      );
     } catch (err) {
       console.warn(
         "Hourly GSC request failed; falling back to daily dimensions",
@@ -167,22 +192,13 @@ export async function fetchGscSearchAnalytics(params: {
     siteUrl: params.siteUrl,
     startDate: params.startDate,
     endDate: params.endDate,
-    dimensions: ["date", "query", "page"],
+    dimensions: ["date", "query", "page", ...segmentDims],
     dataState: "all",
   });
 
-  return batch.map((r) => {
-    const [date, query, page] = r.keys;
-    return {
-      date: formatDateKey(new Date(`${date}T00:00:00Z`)),
-      query: query ?? "",
-      page: page ?? "/",
-      clicks: r.clicks ?? 0,
-      impressions: r.impressions ?? 0,
-      ctr: r.ctr ?? 0,
-      position: r.position ?? 0,
-    };
-  });
+  return batch.map((r) =>
+    mapGscRow(r.keys, r, ["date", "query", "page", ...segmentDims], propertyTimezone),
+  );
 }
 
 export async function listGscSites(accessToken: string): Promise<string[]> {

@@ -84,6 +84,14 @@ export function CommandMenu({
             >
               Conversion Events
             </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/dashboard/pairings");
+                onOpenChange(false);
+              }}
+            >
+              Client pairings
+            </CommandItem>
           </CommandGroup>
         </CommandList>
       </Command>

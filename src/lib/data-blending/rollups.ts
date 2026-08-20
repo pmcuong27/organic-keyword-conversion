@@ -1,5 +1,6 @@
 import type { Ga4MappingRow } from "./query-mapping";
 import type { KeywordAttributionRow } from "./attribution";
+import { classifyOrganicSource, organicSourceDetail } from "./source";
 
 export type LandingPageRollup = {
   landingPage: string;
@@ -15,6 +16,9 @@ export type LandingPageRollup = {
 
 export type ConversionEventRollup = {
   eventName: string;
+  sourceGroup: "google" | "other-engine";
+  sourceLabel: string;
+  sources: string[];
   eventCount: number;
   conversions: number;
   sessions: number;
@@ -71,6 +75,7 @@ export function rollupLandingPages(
 
   for (const row of ga4Rows) {
     if (!isKeyEventRow(row)) continue;
+    if (classifyOrganicSource(row.source) !== "google") continue;
     const entry = byPage.get(row.landingPage) ?? emptyPageAccumulator();
     entry.organicConversions += row.conversions;
     entry.sessions += row.sessions;
@@ -104,6 +109,9 @@ export function rollupConversionEvents(
   const byEvent = new Map<
     string,
     {
+      eventName: string;
+      sourceGroup: "google" | "other-engine";
+      sources: Set<string>;
       eventCount: number;
       conversions: number;
       sessions: number;
@@ -119,7 +127,12 @@ export function rollupConversionEvents(
     const isKeyEvent = isKeyEventRow(row);
     if (mode === "key" && !isKeyEvent) continue;
 
-    const entry = byEvent.get(row.eventName) ?? {
+    const sourceGroup = classifyOrganicSource(row.source);
+    const mapKey = `${row.eventName}::${sourceGroup}`;
+    const entry = byEvent.get(mapKey) ?? {
+      eventName: row.eventName,
+      sourceGroup,
+      sources: new Set<string>(),
       eventCount: 0,
       conversions: 0,
       sessions: 0,
@@ -127,6 +140,9 @@ export function rollupConversionEvents(
       landingPages: new Map<string, number>(),
       isKeyEvent: false,
     };
+    const detail = organicSourceDetail(row.source);
+    if (detail) entry.sources.add(detail);
+    else if (sourceGroup === "google") entry.sources.add("google");
     entry.eventCount += eventCount;
     entry.conversions += keyEvents;
     entry.sessions += row.sessions;
@@ -137,15 +153,19 @@ export function rollupConversionEvents(
       row.landingPage,
       (entry.landingPages.get(row.landingPage) ?? 0) + weight,
     );
-    byEvent.set(row.eventName, entry);
+    byEvent.set(mapKey, entry);
   }
 
-  return [...byEvent.entries()]
-    .map(([eventName, v]) => {
+  return [...byEvent.values()]
+    .map((v) => {
       const topLandingPage =
         [...v.landingPages.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const sources = [...v.sources].sort();
       return {
-        eventName,
+        eventName: v.eventName,
+        sourceGroup: v.sourceGroup,
+        sourceLabel: v.sourceGroup === "google" ? "Google" : "Other Engine",
+        sources,
         eventCount: v.eventCount,
         conversions: v.conversions,
         sessions: v.sessions,
@@ -157,6 +177,7 @@ export function rollupConversionEvents(
     })
     .sort(
       (a, b) =>
+        Number(a.sourceGroup === "other-engine") - Number(b.sourceGroup === "other-engine") ||
         (mode === "key"
           ? b.conversions - a.conversions
           : b.eventCount - a.eventCount) ||

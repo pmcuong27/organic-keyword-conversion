@@ -1,5 +1,6 @@
 import { formatDateKey } from "./normalize";
 import type { Ga4Row } from "./attribution";
+import { normalizeCountry, normalizeDevice } from "./bucket";
 
 function parseGa4DateHour(raw: string): { date: string; hour: string | null } {
   if (raw.length >= 10) {
@@ -17,38 +18,44 @@ function parseGa4DateHour(raw: string): { date: string; hour: string | null } {
   return { date: formatDateKey(new Date()), hour: null };
 }
 
-export async function fetchGa4OrganicConversions(params: {
+function organicDimensions(hourly: boolean, includeSource: boolean) {
+  const dims = hourly
+    ? [
+        { name: "dateHour" },
+        { name: "landingPagePlusQueryString" },
+        { name: "eventName" },
+        { name: "sessionDefaultChannelGroup" },
+        { name: "deviceCategory" },
+        { name: "countryId" },
+      ]
+    : [
+        { name: "date" },
+        { name: "landingPagePlusQueryString" },
+        { name: "eventName" },
+        { name: "sessionDefaultChannelGroup" },
+        { name: "deviceCategory" },
+        { name: "countryId" },
+      ];
+  if (includeSource) dims.push({ name: "sessionSource" });
+  return dims;
+}
+
+async function runOrganicReport(params: {
   accessToken: string;
-  propertyId: string;
+  property: string;
   startDate: string;
   endDate: string;
-  hourly?: boolean;
+  hourly: boolean;
+  includeSource: boolean;
 }): Promise<Ga4Row[]> {
-  const property = params.propertyId.startsWith("properties/")
-    ? params.propertyId
-    : `properties/${params.propertyId}`;
-
   const rows: Ga4Row[] = [];
   let offset = 0;
   const limit = 10000;
-  const hourly = params.hourly ?? false;
 
   while (true) {
     const body = {
       dateRanges: [{ startDate: params.startDate, endDate: params.endDate }],
-      dimensions: hourly
-        ? [
-            { name: "dateHour" },
-            { name: "landingPagePlusQueryString" },
-            { name: "eventName" },
-            { name: "sessionDefaultChannelGroup" },
-          ]
-        : [
-            { name: "date" },
-            { name: "landingPagePlusQueryString" },
-            { name: "eventName" },
-            { name: "sessionDefaultChannelGroup" },
-          ],
+      dimensions: organicDimensions(params.hourly, params.includeSource),
       metrics: [
         { name: "sessions" },
         { name: "eventCount" },
@@ -66,7 +73,7 @@ export async function fetchGa4OrganicConversions(params: {
     };
 
     const res = await fetch(
-      `https://analyticsdata.googleapis.com/v1beta/${property}:runReport`,
+      `https://analyticsdata.googleapis.com/v1beta/${params.property}:runReport`,
       {
         method: "POST",
         headers: {
@@ -94,24 +101,26 @@ export async function fetchGa4OrganicConversions(params: {
     for (const r of batch) {
       const dims = r.dimensionValues.map((d) => d.value);
       const mets = r.metricValues.map((m) => m.value);
-      const parsed = hourly ? parseGa4DateHour(dims[0] ?? "") : parseGa4DateHour(dims[0] ?? "");
+      const parsed = parseGa4DateHour(dims[0] ?? "");
       const date = parsed.date;
-      const hour = hourly ? parsed.hour : null;
-      const landingIdx = 1;
-      const eventIdx = 2;
-      const channelIdx = 3;
+      const hour = params.hourly ? parsed.hour : null;
 
       const eventCount = Number(mets[1] || 0);
       const keyEvents = Number(mets[2] || 0);
       const sessions = Number(mets[0] || 0);
       if (!eventCount && !keyEvents && !sessions) continue;
 
+      const source = params.includeSource ? (dims[6] || "").trim() : "";
+
       rows.push({
         date,
         hour,
-        landingPage: dims[landingIdx] || "/",
-        eventName: dims[eventIdx] || "(not set)",
-        channelGroup: dims[channelIdx] || "Organic Search",
+        landingPage: dims[1] || "/",
+        eventName: dims[2] || "(not set)",
+        channelGroup: dims[3] || "Organic Search",
+        device: normalizeDevice(dims[4]),
+        country: normalizeCountry(dims[5]),
+        source: source || null,
         sessions,
         eventCount,
         conversions: keyEvents,
@@ -126,6 +135,36 @@ export async function fetchGa4OrganicConversions(params: {
   }
 
   return rows;
+}
+
+export async function fetchGa4OrganicConversions(params: {
+  accessToken: string;
+  propertyId: string;
+  startDate: string;
+  endDate: string;
+  hourly?: boolean;
+}): Promise<Ga4Row[]> {
+  const property = params.propertyId.startsWith("properties/")
+    ? params.propertyId
+    : `properties/${params.propertyId}`;
+  const hourly = params.hourly ?? false;
+  const shared = {
+    accessToken: params.accessToken,
+    property,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    hourly,
+  };
+
+  try {
+    return await runOrganicReport({ ...shared, includeSource: true });
+  } catch (err) {
+    console.warn(
+      "GA4 sessionSource request failed; retrying without source",
+      err instanceof Error ? err.message : err,
+    );
+    return runOrganicReport({ ...shared, includeSource: false });
+  }
 }
 
 export async function listGa4Properties(accessToken: string) {

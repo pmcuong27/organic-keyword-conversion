@@ -63,11 +63,23 @@ CRON_SECRET="replace-with-a-long-random-string"
 ```
 
 ```bash
-npm run db:push
+npm run db:migrate
+npm run db:generate
+npm run check:prod-env
 npm run dev
 ```
 
+For a full **HTTPS + managed Postgres** production publish (Vercel, TLS DB, secrets, OAuth domain), follow **[DEPLOY.md](./DEPLOY.md)**.
+
 After deploy, users: **Sign in with Google → pick a GSC site and a GA4 property → Sync**.
+
+## Schema migrations
+
+Production builds run `prisma migrate deploy` before `next build`. Migration history lives in `prisma/migrations/`.
+
+- Local iteration: `npm run db:migrate:dev`
+- Apply pending: `npm run db:migrate`
+- Existing DB created with `db push` / `db:ensure` before migrations: `npm run db:baseline` once, then migrate as usual
 
 ## Automatic daily sync
 

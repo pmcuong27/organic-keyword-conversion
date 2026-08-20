@@ -19,7 +19,7 @@ async function KeywordsContent({ range }: { range: string }) {
     <div className="flex h-full min-h-[calc(100svh-3.5rem)] flex-col gap-3 p-4 md:p-6">
       <PageHeading
         title="Keyword Attribution"
-        help="Each row is a keyword on a landing page and hour (when synced with Last 24 hours). Estimated conversions = that page's GA4 organic key events × the keyword's share of GSC clicks. Open a row for the event breakdown."
+        help="Each row is a keyword on a landing page and hour (when synced with Last 24 hours). Estimated conversions = that page's GA4 Google Organic Search key events × the keyword's propensity share. Key events from other search engines are excluded."
       />
       <KeywordAttributionTable data={rows} />
     </div>

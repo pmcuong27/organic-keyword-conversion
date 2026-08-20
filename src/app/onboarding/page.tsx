@@ -4,6 +4,7 @@ import { isDemoMode } from "@/lib/app-mode";
 import { getGoogleAccessToken } from "@/lib/google-token";
 import { listGa4Properties } from "@/lib/data-blending/ga4";
 import { listGscSites } from "@/lib/data-blending/gsc";
+import { listUserProperties } from "@/lib/properties";
 import { ConnectAccountsForm } from "@/components/dashboard/connect-accounts-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -12,6 +13,9 @@ export default async function OnboardingPage() {
 
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const existing = await listUserProperties(session.user.id);
+  if (existing.length) redirect("/dashboard/pairings");
 
   let gscSites: string[] = [];
   let ga4Properties: Awaited<ReturnType<typeof listGa4Properties>> = [];
@@ -33,10 +37,11 @@ export default async function OnboardingPage() {
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
       <Card className="w-full max-w-xl shadow-none">
         <CardHeader>
-          <CardTitle>Connect Search Console and GA4</CardTitle>
+          <CardTitle>Connect the first client pairing</CardTitle>
           <CardDescription>
-            Pair any Search Console site with any GA4 property the signed-in Google
-            account can access. The same login must have permission on both.
+            Pair a Search Console site with a GA4 property this Google account can access.
+            You can add more client pairings after this — agencies typically save one pair per
+            client.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -52,7 +57,12 @@ export default async function OnboardingPage() {
               You do not need to enable Google Cloud APIs yourself.
             </p>
           ) : null}
-          <ConnectAccountsForm gscSites={gscSites} ga4Properties={ga4Properties} />
+          <ConnectAccountsForm
+            gscSites={gscSites}
+            ga4Properties={ga4Properties}
+            submitLabel="Save first pairing"
+            nextPath="/dashboard"
+          />
         </CardContent>
       </Card>
     </div>

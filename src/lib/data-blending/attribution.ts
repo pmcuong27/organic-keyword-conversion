@@ -1,8 +1,19 @@
+import { attributionBucketKey, bucketHasSegmentation, normalizeHour } from "./bucket";
 import { formatDateKey, normalizeLandingPage, toDateOnly } from "./normalize";
+import {
+  keywordPropensity,
+  normalizePropensityShares,
+  scoreAttributionConfidence,
+  type ConfidenceBreakdown,
+  type ConfidenceLevel,
+} from "./propensity";
+import { isGoogleOrganicForJoin } from "./source";
+
+export type { ConfidenceBreakdown, ConfidenceLevel };
 
 export type GscRow = {
-  date: string; // YYYY-MM-DD
-  hour?: string | null; // 00-23 when hourly
+  date: string;
+  hour?: string | null;
   query: string;
   page: string;
   device?: string | null;
@@ -17,18 +28,16 @@ export type Ga4Row = {
   date: string;
   hour?: string | null;
   landingPage: string;
-  /** Page where the key event fired (may differ from landing page) */
   conversionPage?: string | null;
   eventName: string;
   device?: string | null;
   country?: string | null;
   sessions: number;
-  /** Total event count for this event name (all fires). */
   eventCount?: number;
-  /** Key-event count (GA4 keyEvents metric). */
   conversions: number;
   eventValue: number;
   channelGroup?: string;
+  source?: string | null;
   isKeyEvent?: boolean;
 };
 
@@ -44,24 +53,28 @@ export type KeywordAttributionRow = {
   hour: string | null;
   keyword: string;
   landingPage: string;
+  device: string | null;
+  country: string | null;
   clicks: number;
   impressions: number;
   ctr: number;
   position: number;
   pageTotalClicks: number;
   clickShare: number;
+  propensityShare: number;
   organicConversions: number;
   estimatedConversions: number;
   estimatedConvRate: number;
   estimatedValue: number;
+  confidence: ConfidenceBreakdown;
   eventBreakdown: EventBreakdown[];
 };
 
 /**
  * Attribution model:
- * 1. Group GSC queries by normalized landing page + date (+ hour when present)
- * 2. Map GA4 organic conversions to same page + date (+ hour)
- * 3. Weight keyword conversions by click share on that page/bucket
+ * 1. Join GSC and GA4 on landing page × date × hour × device × country when available
+ * 2. Weight keyword conversions by propensity (clicks × CTR × position × reliability)
+ * 3. Normalize weights so each pool still sums to GA4 key events
  */
 export function blendKeywordAttributions(
   gscRows: GscRow[],
@@ -69,28 +82,35 @@ export function blendKeywordAttributions(
 ): KeywordAttributionRow[] {
   type BucketKey = string;
 
-  const normalizeHour = (hour?: string | null) => {
-    if (hour === undefined || hour === null || hour === "") return null;
-    const n = Number(hour);
-    if (Number.isFinite(n)) return String(Math.max(0, Math.min(23, Math.floor(n)))).padStart(2, "0");
-    return hour.slice(0, 2).padStart(2, "0");
+  type GscNorm = GscRow & {
+    landingPage: string;
+    dateKey: string;
+    hourKey: string | null;
+    bucketKey: BucketKey;
+    rowKey: string;
   };
 
-  const bucketKey = (dateKey: string, hour: string | null, landingPage: string) =>
-    `${dateKey}::${hour ?? "all"}::${landingPage}`;
-
-  const pageBucketClicks = new Map<BucketKey, number>();
-  const gscNormalized: Array<
-    GscRow & { landingPage: string; dateKey: string; hourKey: string | null }
-  > = [];
+  const gscNormalized: GscNorm[] = [];
 
   for (const row of gscRows) {
     const landingPage = normalizeLandingPage(row.page);
     const dateKey = formatDateKey(toDateOnly(row.date));
     const hourKey = normalizeHour(row.hour);
-    const key = bucketKey(dateKey, hourKey, landingPage);
-    pageBucketClicks.set(key, (pageBucketClicks.get(key) ?? 0) + (row.clicks || 0));
-    gscNormalized.push({ ...row, landingPage, dateKey, hourKey });
+    const bucketKey = attributionBucketKey({
+      date: dateKey,
+      hour: hourKey,
+      landingPage,
+      device: row.device,
+      country: row.country,
+    });
+    gscNormalized.push({
+      ...row,
+      landingPage,
+      dateKey,
+      hourKey,
+      bucketKey,
+      rowKey: `${bucketKey}::${row.query || "(anonymized)"}`,
+    });
   }
 
   type Ga4Agg = {
@@ -102,14 +122,20 @@ export function blendKeywordAttributions(
   const ga4ByBucket = new Map<BucketKey, Ga4Agg>();
 
   for (const row of ga4Rows) {
-    // Attribution only uses GA4 key events, not every event name.
     const isKey = row.isKeyEvent ?? (row.conversions || 0) > 0;
     if (!isKey) continue;
+    if (!isGoogleOrganicForJoin(row.source)) continue;
 
     const landingPage = normalizeLandingPage(row.landingPage);
     const dateKey = formatDateKey(toDateOnly(row.date));
     const hourKey = normalizeHour(row.hour);
-    const key = bucketKey(dateKey, hourKey, landingPage);
+    const key = attributionBucketKey({
+      date: dateKey,
+      hour: hourKey,
+      landingPage,
+      device: row.device,
+      country: row.country,
+    });
     const agg = ga4ByBucket.get(key) ?? {
       conversions: 0,
       eventValue: 0,
@@ -126,47 +152,84 @@ export function blendKeywordAttributions(
     ga4ByBucket.set(key, agg);
   }
 
+  const bucketRows = new Map<BucketKey, GscNorm[]>();
+  for (const row of gscNormalized) {
+    const list = bucketRows.get(row.bucketKey) ?? [];
+    list.push(row);
+    bucketRows.set(row.bucketKey, list);
+  }
+
   const out: KeywordAttributionRow[] = [];
 
-  for (const row of gscNormalized) {
-    const key = bucketKey(row.dateKey, row.hourKey, row.landingPage);
-    const pageTotalClicks = pageBucketClicks.get(key) ?? 0;
-    const clickShare = pageTotalClicks > 0 ? row.clicks / pageTotalClicks : 0;
-    const ga4 = ga4ByBucket.get(key);
+  for (const [bucketKey, rows] of bucketRows.entries()) {
+    const ga4 = ga4ByBucket.get(bucketKey);
     const organicConversions = ga4?.conversions ?? 0;
     const organicValue = ga4?.eventValue ?? 0;
-    const estimatedConversions = organicConversions * clickShare;
-    const estimatedValue = organicValue * clickShare;
-    const estimatedConvRate = row.clicks > 0 ? estimatedConversions / row.clicks : 0;
+    const pageTotalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0);
+    const keywordCount = new Set(rows.map((r) => r.query || "(anonymized)")).size;
+    const segmentMatched = bucketHasSegmentation(bucketKey);
 
-    const eventBreakdown: EventBreakdown[] = ga4
-      ? Array.from(ga4.events.entries())
-          .map(([eventName, stats]) => ({
-            eventName,
-            conversions: stats.conversions,
-            eventValue: stats.eventValue,
-            estimatedConversions: stats.conversions * clickShare,
-          }))
-          .sort((a, b) => b.estimatedConversions - a.estimatedConversions)
-      : [];
+    const propensityWeights = rows.map((r) => ({
+      key: r.rowKey,
+      weight: keywordPropensity({
+        clicks: r.clicks,
+        ctr: r.ctr,
+        position: r.position,
+        impressions: r.impressions,
+      }),
+    }));
+    const propensityShares = normalizePropensityShares(propensityWeights);
 
-    out.push({
-      date: row.dateKey,
-      hour: row.hourKey,
-      keyword: row.query || "(anonymized)",
-      landingPage: row.landingPage,
-      clicks: row.clicks,
-      impressions: row.impressions,
-      ctr: row.ctr,
-      position: row.position,
-      pageTotalClicks,
-      clickShare,
-      organicConversions,
-      estimatedConversions,
-      estimatedConvRate,
-      estimatedValue,
-      eventBreakdown,
-    });
+    for (const row of rows) {
+      const clickShare = pageTotalClicks > 0 ? row.clicks / pageTotalClicks : 0;
+      const propensityShare = propensityShares.get(row.rowKey) ?? clickShare;
+      const estimatedConversions = organicConversions * propensityShare;
+      const estimatedValue = organicValue * propensityShare;
+      const estimatedConvRate = row.clicks > 0 ? estimatedConversions / row.clicks : 0;
+
+      const confidence = scoreAttributionConfidence({
+        propensityShare,
+        keywordCount,
+        clicks: row.clicks,
+        impressions: row.impressions,
+        poolKeyEvents: organicConversions,
+        poolSessions: ga4?.sessions ?? 0,
+        segmentMatched,
+      });
+
+      const eventBreakdown: EventBreakdown[] = ga4
+        ? Array.from(ga4.events.entries())
+            .map(([eventName, stats]) => ({
+              eventName,
+              conversions: stats.conversions,
+              eventValue: stats.eventValue,
+              estimatedConversions: stats.conversions * propensityShare,
+            }))
+            .sort((a, b) => b.estimatedConversions - a.estimatedConversions)
+        : [];
+
+      out.push({
+        date: row.dateKey,
+        hour: row.hourKey,
+        keyword: row.query || "(anonymized)",
+        landingPage: row.landingPage,
+        device: row.device ?? null,
+        country: row.country ?? null,
+        clicks: row.clicks,
+        impressions: row.impressions,
+        ctr: row.ctr,
+        position: row.position,
+        pageTotalClicks,
+        clickShare,
+        propensityShare,
+        organicConversions,
+        estimatedConversions,
+        estimatedConvRate,
+        estimatedValue,
+        confidence,
+        eventBreakdown,
+      });
+    }
   }
 
   return out.sort(

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { CommandMenu } from "@/components/dashboard/command-menu";
 import { HelpTip } from "@/components/dashboard/help-tip";
-import { selectPropertyAction } from "@/app/actions/account";
+import { PropertySwitcher } from "@/components/dashboard/property-switcher";
 import type { PropertyOption } from "@/lib/properties";
 
 const ranges = [
@@ -61,43 +61,14 @@ export function AppHeader({
     });
   }
 
-  function onPropertyChange(id: string) {
-    if (id === "none") return;
-    startTransition(async () => {
-      await selectPropertyAction(id);
-      router.refresh();
-    });
-  }
-
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <Select
-          value={selected?.id ?? "none"}
-          onValueChange={onPropertyChange}
-          disabled={!properties.length}
-        >
-          <SelectTrigger className="h-8 w-[260px] text-xs">
-            <SelectValue placeholder="Select GSC × GA4 pair" />
-          </SelectTrigger>
-          <SelectContent>
-            {properties.length ? (
-              properties.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))
-            ) : (
-              <SelectItem value="none">
-                {dataMode === "demo"
-                  ? "Demo data"
-                  : dataMode === "offline-db"
-                    ? "Offline database"
-                    : "No pairing yet"}
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        <PropertySwitcher
+          properties={properties}
+          selectedPropertyId={selectedPropertyId}
+          dataMode={dataMode}
+        />
 
         <Select value={range} onValueChange={updateRange}>
           <SelectTrigger className="h-8 w-[170px] text-xs">

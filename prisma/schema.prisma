@@ -105,6 +105,8 @@ model GscDailyMetric {
   query        String
   page         String
   landingPage  String
+  device       String   @default("")
+  country      String   @default("")
   clicks       Float    @default(0)
   impressions  Float    @default(0)
   ctr          Float    @default(0)
@@ -112,7 +114,7 @@ model GscDailyMetric {
   property     PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
 
-  @@unique([propertyId, date, hour, query, page])
+  @@unique([propertyId, date, hour, query, page, device, country])
   @@index([propertyId, date])
   @@index([propertyId, landingPage, date])
 }
@@ -123,8 +125,11 @@ model Ga4DailyMetric {
   date          DateTime @db.Date
   hour          String   @default("")
   landingPage   String
+  device        String   @default("")
+  country       String   @default("")
   eventName     String
   channelGroup  String   @default("Organic Search")
+  source        String   @default("")
   sessions      Float    @default(0)
   eventCount    Float    @default(0)
   conversions   Float    @default(0)
@@ -133,7 +138,7 @@ model Ga4DailyMetric {
   property      PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt     DateTime @updatedAt
 
-  @@unique([propertyId, date, hour, landingPage, eventName, channelGroup])
+  @@unique([propertyId, date, hour, landingPage, eventName, channelGroup, device, country, source], map: "Ga4DailyMetric_grain_source_key")
   @@index([propertyId, date])
   @@index([propertyId, landingPage, date])
   @@index([propertyId, isKeyEvent])
@@ -147,21 +152,26 @@ model KeywordAttribution {
   hour                String   @default("")
   keyword             String
   landingPage         String
+  device              String   @default("")
+  country             String   @default("")
   clicks              Float    @default(0)
   impressions         Float    @default(0)
   ctr                 Float    @default(0)
   position            Float    @default(0)
   pageTotalClicks     Float    @default(0)
   clickShare          Float    @default(0)
+  propensityShare     Float    @default(0)
   organicConversions  Float    @default(0)
   estimatedConversions Float   @default(0)
   estimatedConvRate   Float    @default(0)
   estimatedValue      Float    @default(0)
+  confidenceScore     Float    @default(0)
+  confidenceLevel     String   @default("low")
   eventBreakdown      Json?
   property            PropertyMapping @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   updatedAt           DateTime @updatedAt
 
-  @@unique([propertyId, date, hour, keyword, landingPage])
+  @@unique([propertyId, date, hour, keyword, landingPage, device, country])
   @@index([propertyId, date])
   @@index([propertyId, estimatedConversions])
   @@index([propertyId, keyword])

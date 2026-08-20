@@ -1,4 +1,7 @@
 export * from "./normalize";
+export * from "./bucket";
+export * from "./source";
+export * from "./propensity";
 export * from "./attribution";
 export * from "./gsc";
 export * from "./ga4";

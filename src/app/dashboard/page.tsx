@@ -23,7 +23,7 @@ async function OverviewContent({ range }: { range: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeading
           title="Overview"
-          help="GSC clicks and impressions are joined to GA4 organic key events on the same landing page and day. Estimated conversions are the page's key events weighted by each keyword's share of clicks. After you pair a Search Console site with a GA4 property, download the last 24 hours to populate the dashboard."
+          help="GSC clicks and impressions are joined to GA4 Organic Search key events from Google (session source google) on the same landing page, hour, device, and country. Key events from other organic engines are excluded from keyword estimates. After you pair a Search Console site with a GA4 property, download the last 24 hours to populate the dashboard."
         />
         {ctx.property ? (
           <p className="text-xs text-muted-foreground">{ctx.property.name}</p>
